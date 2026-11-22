@@ -897,6 +897,7 @@
 
   // Tab "Frequenza Gol": quante volte la squadra ha segnato N gol (in casa e fuori)
   const GOAL_BUCKETS = [
+    { label: "0 Gol", test: g => g === 0 },
     { label: "1 Gol", test: g => g === 1 },
     { label: "2 Gol", test: g => g === 2 },
     { label: "3 Gol", test: g => g === 3 },
