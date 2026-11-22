@@ -125,7 +125,6 @@
       return parseDateTimestamp(parseFloat(str));
     }
 
-    // DD/MM/YYYY o DD/MM/YY o DD-MM-YYYY
     const dmy = str.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})$/);
     if (dmy) {
       const day = parseInt(dmy[1], 10);
@@ -136,7 +135,6 @@
       return Number.isFinite(ts) ? ts : 0;
     }
 
-    // YYYY-MM-DD
     const ymd = str.match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})$/);
     if (ymd) {
       const year = parseInt(ymd[1], 10);
@@ -189,6 +187,17 @@
     }).join("");
   }
 
+  function computeFormScoreFromOutcomes(outcomes) {
+    const last5 = (outcomes || []).slice(-5);
+    let score = 0;
+    for (const r of last5) {
+      if (r === "W") score += 20;
+      else if (r === "D") score += 7.5;
+    }
+    return Number(score.toFixed(1));
+  }
+
+  // Restituisce lo storico ordinato dal più vecchio al più recente (cronologico)
   function collectTeamHistoricalMatches(teamName, leagueCode, resultsRows) {
     const target = String(teamName || "").trim().toLowerCase();
     const divTarget = String(leagueCode || "").trim().toUpperCase();
@@ -558,6 +567,9 @@
           ga: 0,
           gd: 0,
           avgGoals: 0,
+          xgSum: 0,
+          xgCount: 0,
+          xg: 0,
           points: 0
         });
       }
@@ -581,6 +593,17 @@
       homeTeam.ga += ag;
       awayTeam.gf += ag;
       awayTeam.ga += hg;
+
+      const hXG = parseFloat(r.HomeXG ?? r.xG_H ?? r.H_xG);
+      const aXG = parseFloat(r.AwayXG ?? r.xG_A ?? r.A_xG);
+      if (Number.isFinite(hXG)) {
+        homeTeam.xgSum += hXG;
+        homeTeam.xgCount += 1;
+      }
+      if (Number.isFinite(aXG)) {
+        awayTeam.xgSum += aXG;
+        awayTeam.xgCount += 1;
+      }
 
       if (hg > ag) {
         homeTeam.won += 1;
@@ -608,11 +631,22 @@
     ensureTeam(match.home);
     ensureTeam(match.away);
 
-    const list = Array.from(table.values()).map(item => ({
-      ...item,
-      gd: item.gf - item.ga,
-      avgGoals: item.played > 0 ? Number(((item.gf + item.ga) / item.played).toFixed(2)) : 0
-    }));
+    const list = Array.from(table.values()).map(item => {
+      const gd = item.gf - item.ga;
+      const avgGoals = item.played > 0 ? Number(((item.gf + item.ga) / item.played).toFixed(2)) : 0;
+      const avgScored = item.played > 0 ? item.gf / item.played : 1.25;
+      const avgConceded = item.played > 0 ? item.ga / item.played : 1.15;
+      const xg = item.xgCount > 0
+        ? Number((item.xgSum / item.xgCount).toFixed(2))
+        : Number(((avgScored * 0.62) + (avgConceded * 0.38)).toFixed(2));
+
+      return {
+        ...item,
+        gd,
+        avgGoals,
+        xg
+      };
+    });
 
     list.sort((a, b) => {
       if (b.points !== a.points) return b.points - a.points;
@@ -648,18 +682,21 @@
         <tr class="border-b border-slate-800/70 last:border-b-0 transition ${
           isHighlighted ? "standings-team-gold text-amber-200 font-bold" : "hover:bg-slate-800/40 text-slate-200"
         }">
-          <td class="py-2 pl-2 pr-1 text-xs ${isHighlighted ? "text-amber-300 font-extrabold" : "text-slate-400"}">${pos}</td>
+          <td class="py-2 pl-2 pr-1 text-[11px] ${isHighlighted ? "text-amber-300 font-extrabold" : "text-slate-400"}">${pos}</td>
           <td class="py-2 px-1.5 text-xs">
             <div class="flex items-center justify-between gap-1">
               <span class="truncate ${isHighlighted ? "text-amber-200 font-extrabold" : "text-white font-semibold"}">${row.name}</span>
               ${badgeRole ? `<span class="text-[9px] px-1.5 py-0.5 rounded bg-amber-400/20 text-amber-300 border border-amber-400/50 font-extrabold shrink-0">${badgeRole}</span>` : ""}
             </div>
           </td>
-          <td class="py-2 px-1 text-center text-xs ${isHighlighted ? "text-amber-200" : "text-slate-400"}">${row.played}</td>
-          <td class="py-2 px-1 text-center text-xs ${isHighlighted ? "text-emerald-300" : "text-slate-300"}">${row.gf}</td>
-          <td class="py-2 px-1 text-center text-xs ${isHighlighted ? "text-rose-300" : "text-slate-300"}">${row.ga}</td>
-          <td class="py-2 px-1 text-center text-xs ${isHighlighted ? "text-amber-200" : "text-slate-300"}">${row.avgGoals.toFixed(2)}</td>
-          <td class="py-2 px-1 text-center text-xs ${isHighlighted ? "text-amber-200" : "text-slate-300"}">${row.gd > 0 ? `+${row.gd}` : row.gd}</td>
+          <td class="py-2 px-1 text-center text-[11px] ${isHighlighted ? "text-emerald-300" : "text-slate-300"}">${row.won}</td>
+          <td class="py-2 px-1 text-center text-[11px] ${isHighlighted ? "text-yellow-300" : "text-slate-300"}">${row.drawn}</td>
+          <td class="py-2 px-1 text-center text-[11px] ${isHighlighted ? "text-rose-300" : "text-slate-300"}">${row.lost}</td>
+          <td class="py-2 px-1 text-center text-[11px] ${isHighlighted ? "text-emerald-300" : "text-slate-300"}">${row.gf}</td>
+          <td class="py-2 px-1 text-center text-[11px] ${isHighlighted ? "text-rose-300" : "text-slate-300"}">${row.ga}</td>
+          <td class="py-2 px-1 text-center text-[11px] ${isHighlighted ? "text-amber-200" : "text-slate-300"}">${row.gd > 0 ? `+${row.gd}` : row.gd}</td>
+          <td class="py-2 px-1 text-center text-[11px] ${isHighlighted ? "text-amber-200" : "text-slate-300"}">${row.avgGoals.toFixed(2)}</td>
+          <td class="py-2 px-1 text-center text-[11px] ${isHighlighted ? "text-amber-300" : "text-sky-300"}">${row.xg.toFixed(2)}</td>
           <td class="py-2 pl-1 pr-2 text-right text-xs font-extrabold ${isHighlighted ? "text-amber-300" : "text-emerald-400"}">${row.points}</td>
         </tr>
       `;
@@ -681,11 +718,14 @@
               <tr class="border-b border-slate-700/80 text-[10px] uppercase tracking-wider text-slate-400">
                 <th class="py-1.5 pl-2 pr-1">#</th>
                 <th class="py-1.5 px-1.5">Squadra</th>
-                <th class="py-1.5 px-1 text-center" title="Partite giocate">G</th>
+                <th class="py-1.5 px-1 text-center" title="Vittorie">V</th>
+                <th class="py-1.5 px-1 text-center" title="Pareggi">P</th>
+                <th class="py-1.5 px-1 text-center" title="Sconfitte">S</th>
                 <th class="py-1.5 px-1 text-center" title="Gol Fatti">GF</th>
                 <th class="py-1.5 px-1 text-center" title="Gol Subiti">GS</th>
+                <th class="py-1.5 px-1 text-center" title="Differenza Reti">DR</th>
                 <th class="py-1.5 px-1 text-center" title="Media Gol partita">Media</th>
-                <th class="py-1.5 px-1 text-center" title="Differenza reti">DR</th>
+                <th class="py-1.5 px-1 text-center" title="xG medio squadra">xG</th>
                 <th class="py-1.5 pl-1 pr-2 text-right" title="Punti">Pt</th>
               </tr>
             </thead>
@@ -770,10 +810,7 @@
     }
 
     // Dalla più recente alla meno recente
-    const newestFirst = [...histList].sort((a, b) => {
-      if (b.dateTs !== a.dateTs) return b.dateTs - a.dateTs;
-      return b.rowIndex - a.rowIndex;
-    });
+    const newestFirst = [...histList].reverse();
 
     const itemsHtml = newestFirst.map(g => {
       const rowCls = g.outcome === "W"
@@ -888,12 +925,21 @@
     const dateTimeLabel = [dateStr, timeStr].filter(Boolean).join(" • ");
     const giornataLabel = roundLabel || (roundNumber ? `Giornata ${roundNumber}` : "Giornata");
 
-    const homeFormVal = match.homeForm ?? 0;
-    const awayFormVal = match.awayForm ?? 0;
-    const diffFormVal = match.diffForm ?? Math.abs((match.homeForm || 0) - (match.awayForm || 0));
-
+    // Storico ordinato dal più vecchio al più recente: le ultime 5 coincidono esattamente con forma e storico
     const homeHist = collectTeamHistoricalMatches(match.home, leagueCode, resultsRows);
     const awayHist = collectTeamHistoricalMatches(match.away, leagueCode, resultsRows);
+
+    const homeLast5Outcomes = homeHist.length
+      ? homeHist.slice(-5).map(g => g.outcome)
+      : (match.homeFormArr || []).slice(-5);
+    const awayLast5Outcomes = awayHist.length
+      ? awayHist.slice(-5).map(g => g.outcome)
+      : (match.awayFormArr || []).slice(-5);
+
+    const homeFormVal = homeHist.length ? computeFormScoreFromOutcomes(homeLast5Outcomes) : (match.homeForm ?? 0);
+    const awayFormVal = awayHist.length ? computeFormScoreFromOutcomes(awayLast5Outcomes) : (match.awayForm ?? 0);
+    const diffFormVal = Math.abs(homeFormVal - awayFormVal);
+
     const hm = computeTeamMetrics(homeHist, 1.45, 1.05);
     const am = computeTeamMetrics(awayHist, 1.25, 1.25);
     const matchXG = Number(((hm.xg + am.xg) / 1.05).toFixed(2));
@@ -932,7 +978,7 @@
                 <div class="text-lg sm:text-xl font-extrabold text-amber-300">${match.home}</div>
                 <div class="text-[11px] uppercase tracking-wider text-slate-400">Stato di forma (ult. 5)</div>
                 <div class="flex items-center justify-center gap-1.5">
-                  ${renderFormPills(match.homeFormArr)}
+                  ${renderFormPills(homeLast5Outcomes)}
                 </div>
                 <div class="text-sm">${renderPctBadge(homeFormVal, "px-2.5 py-0.5 rounded-lg")}</div>
                 <div class="pt-1 border-t border-slate-800/80 text-xs text-slate-300 space-y-1">
@@ -969,7 +1015,7 @@
                 <div class="text-lg sm:text-xl font-extrabold text-amber-300">${match.away}</div>
                 <div class="text-[11px] uppercase tracking-wider text-slate-400">Stato di forma (ult. 5)</div>
                 <div class="flex items-center justify-center gap-1.5">
-                  ${renderFormPills(match.awayFormArr)}
+                  ${renderFormPills(awayLast5Outcomes)}
                 </div>
                 <div class="text-sm">${renderPctBadge(awayFormVal, "px-2.5 py-0.5 rounded-lg")}</div>
                 <div class="pt-1 border-t border-slate-800/80 text-xs text-slate-300 space-y-1">
