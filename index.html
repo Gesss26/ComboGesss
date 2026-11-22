@@ -16,20 +16,30 @@
       background: linear-gradient(180deg, rgba(20, 27, 41, 0.92) 0%, rgba(15, 21, 33, 0.96) 100%);
       border: 1px solid rgba(148, 163, 184, 0.14);
     }
-    .odd-btn {
-      background: rgba(30, 41, 59, 0.85);
-      border: 1px solid rgba(148, 163, 184, 0.18);
-      transition: all 0.15s ease;
+    .form-pill {
+      width: 22px;
+      height: 22px;
+      border-radius: 6px;
+      font-size: 11px;
+      font-weight: 800;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
     }
-    .odd-btn:hover {
-      border-color: #10b981;
-      background: rgba(16, 185, 129, 0.14);
-    }
-    .odd-btn.active {
-      border-color: #10b981;
-      background: rgba(16, 185, 129, 0.25);
+    .form-W {
+      background: rgba(16, 185, 129, 0.22);
       color: #6ee7b7;
-      font-weight: 700;
+      border: 1px solid rgba(16, 185, 129, 0.45);
+    }
+    .form-D {
+      background: rgba(245, 158, 11, 0.2);
+      color: #fcd34d;
+      border: 1px solid rgba(245, 158, 11, 0.45);
+    }
+    .form-L {
+      background: rgba(239, 68, 68, 0.2);
+      color: #fca5a5;
+      border: 1px solid rgba(239, 68, 68, 0.45);
     }
     ::-webkit-scrollbar { width: 8px; height: 8px; }
     ::-webkit-scrollbar-track { background: #0b0f17; }
@@ -84,7 +94,7 @@
     <section class="lg:col-span-3 space-y-3">
       <div class="flex items-center justify-between">
         <h2 class="text-xs font-bold uppercase tracking-wider text-slate-400">2. Campionati</h2>
-        <span id="selectedCountryBadge" class="text-[11px] text-emerald-400 font-semibold"></span>
+        <div id="selectedCountryBadge" class="flex items-center gap-1.5 text-xs text-emerald-400 font-semibold"></div>
       </div>
       <div id="leaguesList" class="space-y-2.5"></div>
     </section>
@@ -94,8 +104,8 @@
       <div class="glass-card rounded-2xl p-4">
         <div class="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h2 id="currentLeagueTitle" class="text-lg font-bold text-white">Serie A</h2>
-            <p id="currentLeagueSubtitle" class="text-xs text-slate-400">Intera giornata di campionato</p>
+            <div id="currentLeagueTitle" class="flex items-center gap-2 text-lg font-bold text-white"></div>
+            <p id="currentLeagueSubtitle" class="text-xs text-slate-400 mt-0.5">Intera giornata ordinata per differenza di forma</p>
           </div>
           <div class="flex items-center gap-2">
             <button onclick="changeRound(-1)" class="px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs font-bold text-slate-200 border border-slate-700">◀</button>
@@ -110,7 +120,7 @@
       <!-- Dettaglio Statistico Partita Selezionata -->
       <div id="matchStatsBox" class="glass-card rounded-2xl p-4 hidden">
         <div class="flex items-center justify-between mb-3">
-          <h3 id="statsMatchTitle" class="text-sm font-bold text-emerald-300">Confronto Statistico</h3>
+          <div id="statsMatchTitle" class="flex items-center gap-2 text-sm font-bold text-emerald-300"></div>
           <button onclick="document.getElementById('matchStatsBox').classList.add('hidden')" class="text-xs text-slate-400 hover:text-white">Chiudi ✕</button>
         </div>
         <div id="statsMatchBody" class="grid grid-cols-3 gap-2 text-center text-xs"></div>
@@ -118,31 +128,7 @@
     </section>
   </main>
 
-  <!-- ComboGesss Builder Bar in basso -->
-  <aside id="comboBuilderBar" class="sticky bottom-0 z-20 border-t border-emerald-500/30 bg-slate-950/95 backdrop-blur">
-    <div class="max-w-7xl mx-auto px-4 py-3 flex flex-wrap items-center justify-between gap-4">
-      <div class="flex items-center gap-3 flex-wrap">
-        <span class="text-xs font-extrabold uppercase tracking-wider text-emerald-400">🎯 ComboGesss Builder</span>
-        <span id="comboCountBadge" class="px-2 py-0.5 rounded-full text-xs bg-slate-800 text-slate-200">0 selezioni</span>
-        <div id="comboPicksPreview" class="flex flex-wrap gap-1.5"></div>
-      </div>
-      <div class="flex items-center gap-4">
-        <div class="text-right">
-          <div class="text-[11px] text-slate-400">Quota Totale</div>
-          <div id="comboTotalOdd" class="text-base font-extrabold text-emerald-400">1.00</div>
-        </div>
-        <button onclick="copyComboText()" class="px-3.5 py-2 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white transition">
-          📋 Copia Combo
-        </button>
-        <button onclick="clearCombo()" class="px-3 py-2 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-300 transition">
-          Svuota
-        </button>
-      </div>
-    </div>
-  </aside>
-
   <script>
-    // Configurazione Nazioni con bandiere reali (senza sigle IT/ES/GB/DE/FR)
     const NATIONS = [
       {
         id: "Italia",
@@ -202,26 +188,118 @@
       selectedRound: 1,
       resultsRows: [],
       fixturesRows: [],
-      roundsByLeague: {},
-      comboPicks: []
+      roundsByLeague: {}
     };
+
+    // Helper per renderizzare sempre la bandiera senza mai mostrare sigle
+    function renderFlagBadge(nationObj, sizeClass = "w-6 h-4") {
+      if (!nationObj) return `<span class="text-base">⚽</span>`;
+      return `
+        <span class="inline-flex items-center shrink-0">
+          <img
+            src="${nationObj.flagUrl}"
+            alt="${nationObj.name}"
+            title="${nationObj.name}"
+            onerror="this.style.display='none'; this.nextElementSibling.style.display='inline';"
+            class="${sizeClass} object-cover rounded-sm border border-white/15"
+          />
+          <span class="text-base hidden">${nationObj.emojiFlag}</span>
+        </span>
+      `;
+    }
+
+    // Converte seriale Excel (es. 46347) o stringa data in DD/MM/YYYY
+    function formatExcelDate(val) {
+      if (val === null || val === undefined || val === "") return "";
+      if (typeof val === "number" && Number.isFinite(val)) {
+        const serialDays = Math.floor(val);
+        const utcMs = Date.UTC(1899, 11, 30) + serialDays * 86400000;
+        const d = new Date(utcMs);
+        const dd = String(d.getUTCDate()).padStart(2, "0");
+        const mm = String(d.getUTCMonth() + 1).padStart(2, "0");
+        const yyyy = d.getUTCFullYear();
+        return `${dd}/${mm}/${yyyy}`;
+      }
+      const str = String(val).trim();
+      if (/^\d+(\.\d+)?$/.test(str)) {
+        return formatExcelDate(parseFloat(str));
+      }
+      return str;
+    }
+
+    // Converte frazione di giorno Excel (es. 0.5833333333333334 -> 14:00) o stringa ora in HH:MM
+    function formatExcelTime(val) {
+      if (val === null || val === undefined || val === "") return "";
+      if (typeof val === "number" && Number.isFinite(val)) {
+        const dayFraction = val % 1;
+        const totalMinutes = Math.round(dayFraction * 24 * 60) % (24 * 60);
+        const hh = String(Math.floor(totalMinutes / 60)).padStart(2, "0");
+        const mm = String(totalMinutes % 60).padStart(2, "0");
+        return `${hh}:${mm}`;
+      }
+      const str = String(val).trim();
+      if (/^\d+(\.\d+)?$/.test(str)) {
+        return formatExcelTime(parseFloat(str));
+      }
+      return str.slice(0, 5);
+    }
+
+    // Punteggio forma: Vittoria = 20, Pareggio = 7.5, Sconfitta = 0 (ultime 5 partite)
+    function computeFormScore(resultsArr) {
+      const last5 = (resultsArr || []).slice(-5);
+      let score = 0;
+      for (const r of last5) {
+        if (r === "W") score += 20;
+        else if (r === "D") score += 7.5;
+      }
+      return Number(score.toFixed(1));
+    }
+
+    function formatPct(num) {
+      const fixed = Number(num).toFixed(1);
+      return `${fixed.endsWith(".0") ? fixed.slice(0, -2) : fixed.replace(".", ",")}%`;
+    }
 
     function getLeagueMeta(code) {
       for (const n of NATIONS) {
         const found = n.leagues.find(l => l.code === code);
-        if (found) return { ...found, country: n.name, flagUrl: n.flagUrl, emojiFlag: n.emojiFlag };
+        if (found) {
+          return {
+            ...found,
+            nation: n,
+            country: n.name,
+            flagUrl: n.flagUrl,
+            emojiFlag: n.emojiFlag
+          };
+        }
       }
-      return { code, tier: "Lega A", name: code, matchesPerRound: 10, country: "Italia", flagUrl: "", emojiFlag: "⚽" };
+      return {
+        code,
+        tier: "Lega A",
+        name: code,
+        matchesPerRound: 10,
+        nation: NATIONS[0],
+        country: "Italia",
+        flagUrl: NATIONS[0].flagUrl,
+        emojiFlag: "🇮🇹"
+      };
     }
 
-    // Genera dati dimostrativi per l'intera giornata se non ci sono ancora file scaricati
     function buildDemoRounds() {
       const demoTeams = {
         I1: ["Inter", "Milan", "Juventus", "Napoli", "Atalanta", "Lazio", "Roma", "Fiorentina", "Bologna", "Torino", "Como", "Udinese", "Genoa", "Cagliari", "Parma", "Verona", "Empoli", "Lecce", "Monza", "Venezia"],
         I2: ["Palermo", "Sampdoria", "Cremonese", "Bari", "Spezia", "Frosinone", "Salernitana", "Modena", "Pisa", "Cesena", "Brescia", "Catanzaro", "Sudtirol", "Reggiana", "Cosenza", "Mantova", "Carrarese", "Juve Stabia", "Cittadella", "Sassuolo"]
       };
-      const roundsMap = {};
+      const patternPool = [
+        ["W", "W", "D", "W", "L"],
+        ["D", "W", "L", "W", "D"],
+        ["L", "D", "W", "L", "W"],
+        ["W", "L", "L", "D", "W"],
+        ["D", "D", "L", "W", "L"],
+        ["W", "W", "W", "D", "W"]
+      ];
 
+      const roundsMap = {};
       for (const n of NATIONS) {
         for (const lg of n.leagues) {
           const teams = demoTeams[lg.code] || Array.from({ length: lg.matchesPerRound * 2 }, (_, i) => `${lg.name} Team ${i + 1}`);
@@ -231,28 +309,27 @@
             for (let m = 0; m < lg.matchesPerRound; m++) {
               const home = teams[(m * 2 + (r - 1) * 2) % teams.length];
               const away = teams[(m * 2 + 1 + (r - 1) * 2) % teams.length];
+              const homeFormArr = patternPool[(m + r) % patternPool.length];
+              const awayFormArr = patternPool[(m + r + 2) % patternPool.length];
+              const homeForm = computeFormScore(homeFormArr);
+              const awayForm = computeFormScore(awayFormArr);
+              const diffForm = Math.abs(homeForm - awayForm);
+
               matches.push({
                 id: `${lg.code}-R${r}-${m}`,
                 home: home === away ? `${home} Utd` : home,
                 away: away === home ? `${away} City` : away,
-                date: `2026-11-${20 + r}`,
+                date: "22/11/2026",
                 time: m < 5 ? "15:00" : "18:00",
                 ftResult: r === 1 ? `${(m + 1) % 3} - ${m % 2}` : null,
-                odds: {
-                  "1": (1.65 + (m % 5) * 0.25).toFixed(2),
-                  "X": (3.20 + (m % 4) * 0.15).toFixed(2),
-                  "2": (2.10 + ((m + 2) % 5) * 0.35).toFixed(2),
-                  "Ov25": (1.75 + (m % 3) * 0.12).toFixed(2),
-                  "Un25": (1.95 + ((m + 1) % 3) * 0.12).toFixed(2)
-                },
-                stats: {
-                  homeAvgGoals: (1.2 + (m % 4) * 0.25).toFixed(2),
-                  awayAvgGoals: (0.9 + ((m + 1) % 4) * 0.22).toFixed(2),
-                  over25Pct: `${52 + (m % 5) * 6}%`,
-                  bttsPct: `${48 + ((m + 2) % 5) * 5}%`
-                }
+                homeFormArr,
+                awayFormArr,
+                homeForm,
+                awayForm,
+                diffForm
               });
             }
+            matches.sort((a, b) => b.diffForm - a.diffForm);
             rounds.push({ roundNumber: r, label: r === 3 ? `Giornata ${r} (Prossima)` : `Giornata ${r}`, matches });
           }
           roundsMap[lg.code] = rounds;
@@ -261,79 +338,111 @@
       return roundsMap;
     }
 
-    // Trasforma le righe del CSV/Excel di football-data.co.uk in giornate strutturate
     function organizeMatchesIntoRounds(resultsRows, fixturesRows) {
       const baseDemo = buildDemoRounds();
       const groupedByLeague = {};
+      const teamHistoryByDiv = {};
 
-      const normalizeRow = (row, isFixture) => {
+      const cleanResults = (resultsRows || []).map(row => {
         const div = String(row.Div || row.DivCode || "").trim().toUpperCase();
         const home = String(row.HomeTeam || row.Home || "").trim();
         const away = String(row.AwayTeam || row.Away || "").trim();
-        if (!div || !home || !away) return null;
-
-        const hasScore = !isFixture && row.FTHG !== undefined && row.FTHG !== "" && row.FTAG !== undefined && row.FTAG !== "";
-        const odd1 = parseFloat(row.B365H || row.PSH || row.AvgH || row.MaxH);
-        const oddX = parseFloat(row.B365D || row.PSD || row.AvgD || row.MaxD);
-        const odd2 = parseFloat(row.B365A || row.PSA || row.AvgA || row.MaxA);
-        const oddOv = parseFloat(row["B365>2.5"] || row["Avg>2.5"] || row.BbMxOver25);
-        const oddUn = parseFloat(row["B365<2.5"] || row["Avg<2.5"] || row.BbMxUnder25);
-
+        const ftr = String(row.FTR || "").trim().toUpperCase();
         return {
           div,
           home,
           away,
-          date: String(row.Date || "").trim(),
-          time: String(row.Time || "").trim(),
-          ftResult: hasScore ? `${row.FTHG} - ${row.FTAG}` : null,
-          isFixture,
-          odds: {
-            "1": Number.isFinite(odd1) ? odd1.toFixed(2) : "2.10",
-            "X": Number.isFinite(oddX) ? oddX.toFixed(2) : "3.30",
-            "2": Number.isFinite(odd2) ? odd2.toFixed(2) : "3.10",
-            "Ov25": Number.isFinite(oddOv) ? oddOv.toFixed(2) : "1.85",
-            "Un25": Number.isFinite(oddUn) ? oddUn.toFixed(2) : "1.90"
-          }
+          date: formatExcelDate(row.Date),
+          time: formatExcelTime(row.Time),
+          ftResult: (row.FTHG !== undefined && row.FTHG !== "" && row.FTAG !== undefined && row.FTAG !== "")
+            ? `${row.FTHG} - ${row.FTAG}` : null,
+          ftr,
+          isFixture: false
         };
-      };
+      }).filter(x => x.div && x.home && x.away);
 
-      const allParsed = [
-        ...(resultsRows || []).map(r => normalizeRow(r, false)).filter(Boolean),
-        ...(fixturesRows || []).map(r => normalizeRow(r, true)).filter(Boolean)
-      ];
+      for (const item of cleanResults) {
+        if (!teamHistoryByDiv[item.div]) teamHistoryByDiv[item.div] = {};
+        if (!teamHistoryByDiv[item.div][item.home]) teamHistoryByDiv[item.div][item.home] = [];
+        if (!teamHistoryByDiv[item.div][item.away]) teamHistoryByDiv[item.div][item.away] = [];
 
-      if (allParsed.length === 0) {
-        return baseDemo;
+        if (item.ftr === "H") {
+          teamHistoryByDiv[item.div][item.home].push("W");
+          teamHistoryByDiv[item.div][item.away].push("L");
+        } else if (item.ftr === "A") {
+          teamHistoryByDiv[item.div][item.home].push("L");
+          teamHistoryByDiv[item.div][item.away].push("W");
+        } else if (item.ftr === "D") {
+          teamHistoryByDiv[item.div][item.home].push("D");
+          teamHistoryByDiv[item.div][item.away].push("D");
+        }
       }
 
-      for (const item of allParsed) {
+      const cleanFixtures = (fixturesRows || []).map(row => {
+        const div = String(row.Div || row.DivCode || "").trim().toUpperCase();
+        const home = String(row.HomeTeam || row.Home || "").trim();
+        const away = String(row.AwayTeam || row.Away || "").trim();
+        return {
+          div,
+          home,
+          away,
+          date: formatExcelDate(row.Date),
+          time: formatExcelTime(row.Time),
+          ftResult: null,
+          isFixture: true
+        };
+      }).filter(x => x.div && x.home && x.away);
+
+      const allItems = [...cleanResults, ...cleanFixtures];
+      if (!allItems.length) return baseDemo;
+
+      for (const item of allItems) {
         if (!groupedByLeague[item.div]) groupedByLeague[item.div] = [];
         groupedByLeague[item.div].push(item);
       }
 
+      const fallbackCycle = [["W", "D", "W", "L", "W"], ["D", "W", "L", "D", "W"], ["L", "W", "D", "W", "L"]];
       const finalRounds = {};
+
       for (const n of NATIONS) {
         for (const lg of n.leagues) {
           const list = groupedByLeague[lg.code] || [];
-          if (list.length === 0) {
+          if (!list.length) {
             finalRounds[lg.code] = baseDemo[lg.code];
             continue;
           }
+
           const size = lg.matchesPerRound || 10;
           const totalRounds = Math.max(1, Math.ceil(list.length / size));
           const rounds = [];
 
           for (let r = 0; r < totalRounds; r++) {
-            const slice = list.slice(r * size, (r + 1) * size).map((m, idx) => ({
-              ...m,
-              id: `${lg.code}-${r + 1}-${idx}`,
-              stats: {
-                homeAvgGoals: "1.45",
-                awayAvgGoals: "1.15",
-                over25Pct: "56%",
-                bttsPct: "53%"
-              }
-            }));
+            const slice = list.slice(r * size, (r + 1) * size).map((m, idx) => {
+              const histMap = teamHistoryByDiv[lg.code] || {};
+              const homeFormArr = (histMap[m.home] && histMap[m.home].length)
+                ? histMap[m.home].slice(-5)
+                : fallbackCycle[(r + idx) % fallbackCycle.length];
+              const awayFormArr = (histMap[m.away] && histMap[m.away].length)
+                ? histMap[m.away].slice(-5)
+                : fallbackCycle[(r + idx + 1) % fallbackCycle.length];
+
+              const homeForm = computeFormScore(homeFormArr);
+              const awayForm = computeFormScore(awayFormArr);
+              const diffForm = Math.abs(homeForm - awayForm);
+
+              return {
+                ...m,
+                id: `${lg.code}-${r + 1}-${idx}`,
+                homeFormArr,
+                awayFormArr,
+                homeForm,
+                awayForm,
+                diffForm
+              };
+            });
+
+            slice.sort((a, b) => b.diffForm - a.diffForm);
+
             const roundNum = r + 1;
             const isLast = roundNum === totalRounds;
             rounds.push({
@@ -349,7 +458,6 @@
       return finalRounds;
     }
 
-    // Caricamento automatico all'apertura dai file Excel/CSV scaricati nella cartella ./data/
     async function autoLoadComboGesssData(forceReload = false) {
       const statusEl = document.getElementById("dataStatusText");
       statusEl.textContent = "Caricamento automatico file da ./data/...";
@@ -381,7 +489,6 @@
         }
       }
 
-      // Fallback su localStorage se fetch non disponibile (es. file:// in locale)
       if (!loadedAny && !forceReload) {
         try {
           const cachedRes = JSON.parse(localStorage.getItem("combogesss_results") || "[]");
@@ -446,13 +553,7 @@
             }"
           >
             <div class="flex items-center gap-3">
-              <img
-                src="${nation.flagUrl}"
-                alt="${nation.name}"
-                onerror="this.style.display='none'; this.nextElementSibling.style.display='inline';"
-                class="w-7 h-5 object-cover rounded-sm border border-white/15 shrink-0"
-              />
-              <span class="text-xl hidden">${nation.emojiFlag}</span>
+              ${renderFlagBadge(nation, "w-7 h-5")}
               <span class="font-semibold text-sm">${nation.name}</span>
             </div>
             <span class="text-xs ${active ? "text-emerald-300" : "text-slate-500"}">▶</span>
@@ -463,7 +564,8 @@
 
     function renderLeagues() {
       const nation = NATIONS.find(n => n.id === state.selectedCountry) || NATIONS[0];
-      document.getElementById("selectedCountryBadge").textContent = nation.name;
+      document.getElementById("selectedCountryBadge").innerHTML =
+        `${renderFlagBadge(nation, "w-5 h-3.5")} <span>${nation.name}</span>`;
 
       const container = document.getElementById("leaguesList");
       container.innerHTML = nation.leagues.map(lg => {
@@ -482,8 +584,9 @@
             }"
           >
             <div class="flex items-center justify-between mb-1">
-              <span class="text-[11px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-slate-800 text-emerald-300">
-                ${lg.tier}
+              <span class="inline-flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-slate-800 text-emerald-300">
+                ${renderFlagBadge(nation, "w-4 h-3")}
+                <span>${lg.tier}</span>
               </span>
               <span class="text-[11px] text-slate-400">${countMatches} partite</span>
             </div>
@@ -493,13 +596,25 @@
       }).join("");
     }
 
+    function renderFormPills(arr) {
+      return (arr || []).slice(-5).map(res => {
+        const italianLabel = res === "W" ? "V" : res === "D" ? "P" : "S";
+        return `<span class="form-pill form-${res}" title="${italianLabel}">${italianLabel}</span>`;
+      }).join("");
+    }
+
     function renderMatches() {
       const meta = getLeagueMeta(state.selectedLeagueCode);
       const rounds = state.roundsByLeague[state.selectedLeagueCode] || [];
       const roundObj = rounds.find(r => r.roundNumber === state.selectedRound) || rounds[0];
 
-      document.getElementById("currentLeagueTitle").innerHTML =
-        `${meta.emojiFlag} ${meta.name} <span class="text-xs font-normal text-slate-400">(${meta.country} • ${meta.tier})</span>`;
+      document.getElementById("currentLeagueTitle").innerHTML = `
+        ${renderFlagBadge(meta.nation, "w-6 h-4")}
+        <span>${meta.name}</span>
+        <span class="inline-flex items-center gap-1.5 text-xs font-normal text-slate-400">
+          (${meta.country} • ${meta.tier})
+        </span>
+      `;
 
       const roundSelect = document.getElementById("roundSelect");
       roundSelect.innerHTML = rounds.map(r =>
@@ -508,7 +623,7 @@
 
       const matches = roundObj ? roundObj.matches : [];
       document.getElementById("currentLeagueSubtitle").textContent =
-        `${roundObj ? roundObj.label : "Giornata"} • ${matches.length} partite nella giornata`;
+        `${roundObj ? roundObj.label : "Giornata"} • ${matches.length} partite • Ordinate per Diff. Forma (V=20, P=7,5, S=0)`;
 
       const listEl = document.getElementById("matchesList");
       if (!matches.length) {
@@ -517,37 +632,40 @@
       }
 
       listEl.innerHTML = matches.map(m => {
-        const isPicked = (market) => state.comboPicks.some(p => p.matchId === m.id && p.market === market);
+        const dateTimeStr = [m.date, m.time].filter(Boolean).join(" • ");
         return `
           <div class="glass-card rounded-xl p-3.5 hover:border-slate-600 transition">
-            <div class="flex flex-wrap items-center justify-between gap-2 mb-2.5">
+            <div class="flex flex-wrap items-center justify-between gap-3">
               <button onclick="openMatchStats('${m.id}')" class="text-left group flex-1 min-w-[210px]">
                 <div class="flex items-center gap-2 text-sm font-bold text-white group-hover:text-emerald-300 transition">
+                  ${renderFlagBadge(meta.nation, "w-4 h-3")}
                   <span>${m.home}</span>
                   <span class="text-slate-500 font-normal">vs</span>
                   <span>${m.away}</span>
                 </div>
                 <div class="text-[11px] text-slate-400 mt-0.5">
-                  ${[m.date, m.time].filter(Boolean).join(" • ") || "Programma campionato"}
+                  ${dateTimeStr || "Programma campionato"}
                   ${m.ftResult ? ` • <span class="text-emerald-400 font-semibold">FT ${m.ftResult}</span>` : ""}
                 </div>
               </button>
 
-              <div class="flex items-center gap-1.5 flex-wrap">
-                ${["1", "X", "2", "Ov25", "Un25"].map(mkt => {
-                  const labelMap = { "1": "1", "X": "X", "2": "2", "Ov25": "Ov 2.5", "Un25": "Un 2.5" };
-                  const oddVal = m.odds[mkt];
-                  const activeClass = isPicked(mkt) ? "active" : "";
-                  return `
-                    <button
-                      onclick="toggleComboPick('${m.id}', '${mkt}', '${m.home} - ${m.away}', '${labelMap[mkt]}', ${oddVal})"
-                      class="odd-btn ${activeClass} px-2.5 py-1.5 rounded-lg text-xs flex flex-col items-center min-w-[52px]"
-                    >
-                      <span class="text-[10px] text-slate-400">${labelMap[mkt]}</span>
-                      <span>${oddVal}</span>
-                    </button>
-                  `;
-                }).join("")}
+              <!-- Stato di forma ultime 5 partite + Differenza positiva -->
+              <div class="flex items-center gap-3 flex-wrap">
+                <div class="text-right">
+                  <div class="text-[10px] uppercase tracking-wider text-slate-400">Stato di forma (ult. 5)</div>
+                  <div class="flex items-center gap-2 mt-1">
+                    <div class="flex items-center gap-1">${renderFormPills(m.homeFormArr)}</div>
+                    <span class="text-[11px] font-bold text-slate-200">${formatPct(m.homeForm)}</span>
+                    <span class="text-slate-600">|</span>
+                    <div class="flex items-center gap-1">${renderFormPills(m.awayFormArr)}</div>
+                    <span class="text-[11px] font-bold text-slate-200">${formatPct(m.awayForm)}</span>
+                  </div>
+                </div>
+
+                <div class="px-3 py-1.5 rounded-xl bg-emerald-500/15 border border-emerald-500/35 text-center min-w-[78px]">
+                  <div class="text-[10px] uppercase tracking-wider text-emerald-300 font-semibold">Diff. Forma</div>
+                  <div class="text-sm font-extrabold text-white">${formatPct(m.diffForm)}</div>
+                </div>
               </div>
             </div>
           </div>
@@ -556,6 +674,7 @@
     }
 
     function openMatchStats(matchId) {
+      const meta = getLeagueMeta(state.selectedLeagueCode);
       const rounds = state.roundsByLeague[state.selectedLeagueCode] || [];
       let foundMatch = null;
       for (const r of rounds) {
@@ -566,67 +685,24 @@
 
       const box = document.getElementById("matchStatsBox");
       box.classList.remove("hidden");
-      document.getElementById("statsMatchTitle").textContent = `${foundMatch.home} vs ${foundMatch.away}`;
+      document.getElementById("statsMatchTitle").innerHTML = `
+        ${renderFlagBadge(meta.nation, "w-5 h-3.5")}
+        <span>${foundMatch.home} vs ${foundMatch.away} (${[foundMatch.date, foundMatch.time].filter(Boolean).join(" • ")})</span>
+      `;
       document.getElementById("statsMatchBody").innerHTML = `
         <div class="bg-slate-900/80 rounded-lg p-2.5 border border-slate-800">
-          <div class="text-slate-400">Media Gol Casa / Trasf.</div>
-          <div class="font-bold text-sm text-white mt-1">${foundMatch.stats.homeAvgGoals} — ${foundMatch.stats.awayAvgGoals}</div>
+          <div class="text-slate-400">Forma ${foundMatch.home}</div>
+          <div class="font-bold text-sm text-emerald-300 mt-1">${formatPct(foundMatch.homeForm)}</div>
         </div>
         <div class="bg-slate-900/80 rounded-lg p-2.5 border border-slate-800">
-          <div class="text-slate-400">% Over 2.5</div>
-          <div class="font-bold text-sm text-emerald-300 mt-1">${foundMatch.stats.over25Pct}</div>
+          <div class="text-slate-400">Differenza (Positiva)</div>
+          <div class="font-bold text-sm text-white mt-1">${formatPct(foundMatch.diffForm)}</div>
         </div>
         <div class="bg-slate-900/80 rounded-lg p-2.5 border border-slate-800">
-          <div class="text-slate-400">% Gol (BTTS)</div>
-          <div class="font-bold text-sm text-sky-300 mt-1">${foundMatch.stats.bttsPct}</div>
+          <div class="text-slate-400">Forma ${foundMatch.away}</div>
+          <div class="font-bold text-sm text-sky-300 mt-1">${formatPct(foundMatch.awayForm)}</div>
         </div>
       `;
-    }
-
-    function toggleComboPick(matchId, market, matchLabel, marketLabel, odd) {
-      const idx = state.comboPicks.findIndex(p => p.matchId === matchId && p.market === market);
-      if (idx >= 0) {
-        state.comboPicks.splice(idx, 1);
-      } else {
-        // Sostituisce eventuale altra giocata sulla stessa partita per evitare conflitti in combo
-        state.comboPicks = state.comboPicks.filter(p => p.matchId !== matchId);
-        state.comboPicks.push({ matchId, market, matchLabel, marketLabel, odd: Number(odd) });
-      }
-      renderMatches();
-      renderComboBuilder();
-    }
-
-    function renderComboBuilder() {
-      const count = state.comboPicks.length;
-      document.getElementById("comboCountBadge").textContent = `${count} ${count === 1 ? "selezione" : "selezioni"}`;
-
-      const total = count
-        ? state.comboPicks.reduce((acc, p) => acc * p.odd, 1).toFixed(2)
-        : "1.00";
-      document.getElementById("comboTotalOdd").textContent = total;
-
-      document.getElementById("comboPicksPreview").innerHTML = state.comboPicks.map(p => `
-        <span class="px-2.5 py-1 rounded-lg text-xs bg-emerald-500/15 text-emerald-200 border border-emerald-500/30">
-          ${p.matchLabel}: <strong>${p.marketLabel}</strong> (@${p.odd.toFixed(2)})
-        </span>
-      `).join("");
-    }
-
-    function clearCombo() {
-      state.comboPicks = [];
-      renderMatches();
-      renderComboBuilder();
-    }
-
-    function copyComboText() {
-      if (!state.comboPicks.length) return;
-      const total = state.comboPicks.reduce((acc, p) => acc * p.odd, 1).toFixed(2);
-      const lines = [
-        "⚽ ComboGesss Schedina:",
-        ...state.comboPicks.map(p => `- ${p.matchLabel} -> ${p.marketLabel} (@${p.odd.toFixed(2)})`),
-        `Quota Totale: ${total}`
-      ].join("\n");
-      navigator.clipboard?.writeText(lines);
     }
 
     function selectCountry(countryId) {
@@ -665,7 +741,6 @@
       renderCountries();
       renderLeagues();
       renderMatches();
-      renderComboBuilder();
     }
 
     window.addEventListener("DOMContentLoaded", () => {
