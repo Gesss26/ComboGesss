@@ -63,6 +63,19 @@
     return `${fixed.endsWith(".0") ? fixed.slice(0, -2) : fixed.replace(".", ",")}%`;
   }
 
+  function formatOdd(val) {
+    const n = Number(val);
+    if (!Number.isFinite(n) || n <= 1) return "—";
+    return n.toFixed(2);
+  }
+
+  function fairOddFromPct(pct) {
+    const p = clampPct(pct);
+    if (p <= 0.5) return "—";
+    const raw = 100 / p;
+    return Math.min(99.99, Math.max(1.01, raw)).toFixed(2);
+  }
+
   function getPctColorClass(val) {
     const p = clampPct(val);
     if (p >= 90) return "pct-gold";
@@ -143,22 +156,64 @@
         const isHome = h === target;
         const hg = Number(r.FTHG);
         const ag = Number(r.FTAG);
+        const gf = isHome ? hg : ag;
+        const ga = isHome ? ag : hg;
         const totalGoals = hg + ag;
         const ftr = String(r.FTR || "").trim().toUpperCase() || (hg > ag ? "H" : hg < ag ? "A" : "D");
         const outcome = ftr === "D" ? "D" : ((isHome && ftr === "H") || (!isHome && ftr === "A") ? "W" : "L");
 
+        const homeXG = parseFloat(r.HomeXG ?? r.xG_H ?? r.H_xG);
+        const awayXG = parseFloat(r.AwayXG ?? r.xG_A ?? r.A_xG);
+        const xgf = isHome ? homeXG : awayXG;
+        const xga = isHome ? awayXG : homeXG;
+
         return {
           isHome,
+          gf,
+          ga,
           totalGoals,
           btts: hg > 0 && ag > 0,
-          outcome
+          outcome,
+          xgf: Number.isFinite(xgf) ? xgf : null,
+          xga: Number.isFinite(xga) ? xga : null
         };
       });
+  }
+
+  function computeTeamMetrics(hist, fallbackScored, fallbackConceded) {
+    if (!hist.length) {
+      const avgScored = fallbackScored;
+      const avgConceded = fallbackConceded;
+      const xg = Number(((avgScored * 0.65) + (avgConceded * 0.35)).toFixed(2));
+      return { avgScored, avgConceded, xg, isEstimatedXG: true };
+    }
+
+    const totalScored = hist.reduce((s, x) => s + x.gf, 0);
+    const totalConceded = hist.reduce((s, x) => s + x.ga, 0);
+    const avgScored = Number((totalScored / hist.length).toFixed(2));
+    const avgConceded = Number((totalConceded / hist.length).toFixed(2));
+
+    const xgRows = hist.filter(x => x.xgf !== null);
+    let xg;
+    let isEstimatedXG = false;
+    if (xgRows.length) {
+      xg = Number((xgRows.reduce((s, x) => s + x.xgf, 0) / xgRows.length).toFixed(2));
+    } else {
+      xg = Number(((avgScored * 0.62) + (avgConceded * 0.38)).toFixed(2));
+      isEstimatedXG = true;
+    }
+
+    return { avgScored, avgConceded, xg, isEstimatedXG };
   }
 
   function computeMatchFamilies(match, leagueCode, resultsRows) {
     const homeHist = collectTeamHistoricalMatches(match.home, leagueCode, resultsRows);
     const awayHist = collectTeamHistoricalMatches(match.away, leagueCode, resultsRows);
+
+    const homeMetrics = computeTeamMetrics(homeHist, 1.45, 1.05);
+    const awayMetrics = computeTeamMetrics(awayHist, 1.25, 1.25);
+
+    const matchXG = Number(((homeMetrics.xg + awayMetrics.xg) / 1.05).toFixed(2));
 
     const rate = (arr, pred, fallbackPct) => {
       if (!arr.length) return fallbackPct;
@@ -211,87 +266,103 @@
     const joint = (aPct, bPct, boost = 1.06) =>
       Math.min(98, Math.max(1, ((aPct / 100) * (bPct / 100)) * 100 * boost));
 
+    const bookOdds = match.bookOdds || {};
+
+    const mkItem = (label, pct, realOddKey) => {
+      const hasReal = bookOdds[realOddKey] !== undefined && bookOdds[realOddKey] !== null && bookOdds[realOddKey] !== "";
+      const odd = hasReal ? formatOdd(bookOdds[realOddKey]) : fairOddFromPct(pct);
+      return {
+        label,
+        pct,
+        odd,
+        oddType: hasReal ? "Quota" : "Equa"
+      };
+    };
+
     return {
       sampleInfo: `${homeHist.length} gare ${match.home} • ${awayHist.length} gare ${match.away}`,
+      homeMetrics,
+      awayMetrics,
+      matchXG,
       families: [
         {
           title: "Fisse",
           layout: "grid-3",
           items: [
-            { label: "1", pct: p1 },
-            { label: "X", pct: px },
-            { label: "2", pct: p2 }
+            mkItem("1", p1, "1"),
+            mkItem("X", px, "X"),
+            mkItem("2", p2, "2")
           ]
         },
         {
           title: "DC",
           layout: "grid-3",
           items: [
-            { label: "1X", pct: p1X },
-            { label: "X2", pct: pX2 },
-            { label: "12", pct: p12 }
+            mkItem("1X", p1X),
+            mkItem("X2", pX2),
+            mkItem("12", p12)
           ]
         },
         {
           title: "Over/Under",
           layout: "over-under-rows",
           overItems: [
-            { label: "Over 1,5", pct: ov15 },
-            { label: "Over 2,5", pct: ov25 },
-            { label: "Over 3,5", pct: ov35 },
-            { label: "Over 4,5", pct: ov45 }
+            mkItem("Over 1,5", ov15),
+            mkItem("Over 2,5", ov25, "Ov25"),
+            mkItem("Over 3,5", ov35),
+            mkItem("Over 4,5", ov45)
           ],
           underItems: [
-            { label: "Under 1,5", pct: un15 },
-            { label: "Under 2,5", pct: un25 },
-            { label: "Under 3,5", pct: un35 },
-            { label: "Under 4,5", pct: un45 }
+            mkItem("Under 1,5", un15),
+            mkItem("Under 2,5", un25, "Un25"),
+            mkItem("Under 3,5", un35),
+            mkItem("Under 4,5", un45)
           ]
         },
         {
           title: "Goal",
           layout: "grid-2",
           items: [
-            { label: "GG", pct: gg },
-            { label: "NG", pct: ng }
+            mkItem("GG", gg),
+            mkItem("NG", ng)
           ]
         },
         {
           title: "Multigol Totali",
           layout: "grid-2",
           items: [
-            { label: "1-4", pct: mg14 },
-            { label: "2-5", pct: mg25 }
+            mkItem("1-4", mg14),
+            mkItem("2-5", mg25)
           ]
         },
         {
           title: "Combo DC+Over",
           layout: "grid-3",
           items: [
-            { label: "1X + Over 1,5", pct: joint(p1X, ov15, 1.08) },
-            { label: "X2 + Over 1,5", pct: joint(pX2, ov15, 1.08) },
-            { label: "12 + Over 1,5", pct: joint(p12, ov15, 1.10) }
+            mkItem("1X + Over 1,5", joint(p1X, ov15, 1.08)),
+            mkItem("X2 + Over 1,5", joint(pX2, ov15, 1.08)),
+            mkItem("12 + Over 1,5", joint(p12, ov15, 1.10))
           ]
         },
         {
           title: "Combo DC+Under",
           layout: "grid-3",
           items: [
-            { label: "1X + Under 4,5", pct: joint(p1X, un45, 1.07) },
-            { label: "X2 + Under 4,5", pct: joint(pX2, un45, 1.07) },
-            { label: "12 + Under 4,5", pct: joint(p12, un45, 1.06) }
+            mkItem("1X + Under 4,5", joint(p1X, un45, 1.07)),
+            mkItem("X2 + Under 4,5", joint(pX2, un45, 1.07)),
+            mkItem("12 + Under 4,5", joint(p12, un45, 1.06))
           ]
         },
         {
           title: "Combo DC+Multigol Totali",
           layout: "grid-3",
           items: [
-            { label: "1X + Multigol 1-4", pct: joint(p1X, mg14, 1.07) },
-            { label: "1X + Multigol 2-5", pct: joint(p1X, mg25, 1.06) },
-            { label: "X2 + Multigol 1-4", pct: joint(pX2, mg14, 1.07) },
-            { label: "X2 + Multigol 2-5", pct: joint(pX2, mg25, 1.06) },
-            { label: "12 + Multigol 1-4", pct: joint(p12, mg14, 1.07) },
-            { label: "12 + Multigol 2-5", pct: joint(p12, mg25, 1.06) }
+            mkItem("1X + Multigol 1-4", joint(p1X, mg14, 1.07)),
+            mkItem("1X + Multigol 2-5", joint(p1X, mg25, 1.06)),
+            mkItem("X2 + Multigol 1-4", joint(pX2, mg14, 1.07)),
+            mkItem("X2 + Multigol 2-5", joint(pX2, mg25, 1.06)),
+            mkItem("12 + Multigol 1-4", joint(p12, mg14, 1.07)),
+            mkItem("12 + Multigol 2-5", joint(p12, mg25, 1.06))
           ]
         }
       ]
@@ -303,7 +374,12 @@
     return `
       <div class="rounded-xl bg-slate-950/80 border border-slate-800/90 hover:border-emerald-500/40 px-3 py-2.5 flex items-center justify-between gap-2 transition ${isBomb ? "flag-bomb" : ""}">
         <span class="text-xs font-bold text-slate-200 leading-tight">${item.label}</span>
-        ${renderPctBadge(item.pct, "text-xs sm:text-sm shrink-0")}
+        <div class="text-right shrink-0">
+          <div>${renderPctBadge(item.pct, "text-xs sm:text-sm")}</div>
+          <div class="text-[11px] font-semibold text-amber-300/90 mt-0.5">
+            @${item.odd} <span class="text-[10px] text-slate-400 font-normal">(${item.oddType})</span>
+          </div>
+        </div>
       </div>
     `;
   }
@@ -404,6 +480,8 @@
     const diffFormVal = match.diffForm ?? Math.abs((match.homeForm || 0) - (match.awayForm || 0));
 
     const computed = computeMatchFamilies(match, leagueCode, resultsRows);
+    const hm = computed.homeMetrics;
+    const am = computed.awayMetrics;
 
     content.innerHTML = `
       <div class="rounded-2xl bg-gradient-to-br from-slate-900 via-slate-900 to-emerald-950/30 border border-slate-700/70 p-5 sm:p-6 shadow-2xl">
@@ -424,6 +502,7 @@
         </div>
 
         <div class="grid grid-cols-1 md:grid-cols-3 items-center gap-4 text-center">
+          <!-- Squadra Casa -->
           <div class="rounded-xl bg-slate-950/70 border border-slate-800 p-4 space-y-2.5">
             <div class="text-lg sm:text-xl font-extrabold text-white">${match.home}</div>
             <div class="text-[11px] uppercase tracking-wider text-slate-400">Stato di forma (ult. 5)</div>
@@ -431,8 +510,20 @@
               ${renderFormPills(match.homeFormArr)}
             </div>
             <div class="text-sm">${renderPctBadge(homeFormVal, "px-2.5 py-0.5 rounded-lg")}</div>
+            <div class="pt-1 border-t border-slate-800/80 text-xs text-slate-300 space-y-1">
+              <div>
+                Media Gol: <strong class="text-emerald-300">${hm.avgScored.toFixed(2)}</strong>
+                <span class="text-slate-500">/</span>
+                <strong class="text-rose-300">${hm.avgConceded.toFixed(2)}</strong>
+                <span class="text-[10px] text-slate-400">(F/S)</span>
+              </div>
+              <div>
+                xG Squadra: <strong class="text-amber-300">${hm.xg.toFixed(2)}</strong>
+              </div>
+            </div>
           </div>
 
+          <!-- Centro Partita -->
           <div class="space-y-2">
             <div class="text-xs uppercase tracking-widest text-slate-400 font-bold">Partita</div>
             <div class="text-2xl font-black text-white">VS</div>
@@ -441,9 +532,14 @@
               <div class="text-[11px] text-slate-400">Differenza Forma (Positiva)</div>
               <div class="text-base mt-0.5">${renderPctBadge(diffFormVal, "px-2.5 py-0.5 rounded-lg")}</div>
             </div>
+            <div class="rounded-xl bg-slate-950/70 border border-slate-800 px-3 py-2 inline-block">
+              <div class="text-[10px] uppercase tracking-wider text-slate-400">xG Partita Stimato</div>
+              <div class="text-sm font-extrabold text-amber-300">${computed.matchXG.toFixed(2)}</div>
+            </div>
             <div class="text-[11px] text-slate-500">${computed.sampleInfo}</div>
           </div>
 
+          <!-- Squadra Trasferta -->
           <div class="rounded-xl bg-slate-950/70 border border-slate-800 p-4 space-y-2.5">
             <div class="text-lg sm:text-xl font-extrabold text-white">${match.away}</div>
             <div class="text-[11px] uppercase tracking-wider text-slate-400">Stato di forma (ult. 5)</div>
@@ -451,6 +547,17 @@
               ${renderFormPills(match.awayFormArr)}
             </div>
             <div class="text-sm">${renderPctBadge(awayFormVal, "px-2.5 py-0.5 rounded-lg")}</div>
+            <div class="pt-1 border-t border-slate-800/80 text-xs text-slate-300 space-y-1">
+              <div>
+                Media Gol: <strong class="text-sky-300">${am.avgScored.toFixed(2)}</strong>
+                <span class="text-slate-500">/</span>
+                <strong class="text-rose-300">${am.avgConceded.toFixed(2)}</strong>
+                <span class="text-[10px] text-slate-400">(F/S)</span>
+              </div>
+              <div>
+                xG Squadra: <strong class="text-amber-300">${am.xg.toFixed(2)}</strong>
+              </div>
+            </div>
           </div>
         </div>
       </div>

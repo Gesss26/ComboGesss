@@ -312,6 +312,22 @@
       return str.slice(0, 5);
     }
 
+    function extractBookOdds(row) {
+      const odd1 = parseFloat(row.B365H ?? row.PSH ?? row.AvgH ?? row.MaxH ?? row["1"]);
+      const oddX = parseFloat(row.B365D ?? row.PSD ?? row.AvgD ?? row.MaxD ?? row["X"]);
+      const odd2 = parseFloat(row.B365A ?? row.PSA ?? row.AvgA ?? row.MaxA ?? row["2"]);
+      const oddOv = parseFloat(row["B365>2.5"] ?? row["Avg>2.5"] ?? row.BbMxOver25 ?? row["Over 2,5"]);
+      const oddUn = parseFloat(row["B365<2.5"] ?? row["Avg<2.5"] ?? row.BbMxUnder25 ?? row["Under 2,5"]);
+
+      const bookOdds = {};
+      if (Number.isFinite(odd1) && odd1 > 1) bookOdds["1"] = odd1;
+      if (Number.isFinite(oddX) && oddX > 1) bookOdds["X"] = oddX;
+      if (Number.isFinite(odd2) && odd2 > 1) bookOdds["2"] = odd2;
+      if (Number.isFinite(oddOv) && oddOv > 1) bookOdds["Ov25"] = oddOv;
+      if (Number.isFinite(oddUn) && oddUn > 1) bookOdds["Un25"] = oddUn;
+      return bookOdds;
+    }
+
     function computeFormScore(resultsArr) {
       const last5 = (resultsArr || []).slice(-5);
       let score = 0;
@@ -388,7 +404,8 @@
                 awayFormArr,
                 homeForm,
                 awayForm,
-                diffForm
+                diffForm,
+                bookOdds: {}
               });
             }
             matches.sort((a, b) => b.diffForm - a.diffForm);
@@ -419,6 +436,7 @@
           ftResult: (row.FTHG !== undefined && row.FTHG !== "" && row.FTAG !== undefined && row.FTAG !== "")
             ? `${row.FTHG} - ${row.FTAG}` : null,
           ftr,
+          bookOdds: extractBookOdds(row),
           isFixture: false
         };
       }).filter(x => x.div && x.home && x.away);
@@ -451,6 +469,7 @@
           date: formatExcelDate(row.Date),
           time: formatExcelTime(row.Time),
           ftResult: null,
+          bookOdds: extractBookOdds(row),
           isFixture: true
         };
       }).filter(x => x.div && x.home && x.away);
