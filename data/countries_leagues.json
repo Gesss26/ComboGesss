@@ -1,0 +1,156 @@
+[
+  {
+    "country": "Italia",
+    "flag": "🇮🇹",
+    "leagues": [
+      {
+        "code": "I1",
+        "name": "Serie A"
+      },
+      {
+        "code": "I2",
+        "name": "Serie B"
+      }
+    ]
+  },
+  {
+    "country": "Inghilterra",
+    "flag": "🏴󠁧󠁢󠁥󠁮󠁧󠁿",
+    "leagues": [
+      {
+        "code": "E0",
+        "name": "Premier League"
+      },
+      {
+        "code": "E1",
+        "name": "Championship"
+      },
+      {
+        "code": "E2",
+        "name": "League One"
+      },
+      {
+        "code": "E3",
+        "name": "League Two"
+      },
+      {
+        "code": "EC",
+        "name": "National League"
+      }
+    ]
+  },
+  {
+    "country": "Scozia",
+    "flag": "🏴󠁧󠁢󠁳󠁣󠁴󠁿",
+    "leagues": [
+      {
+        "code": "SC0",
+        "name": "Premiership"
+      },
+      {
+        "code": "SC1",
+        "name": "Championship"
+      },
+      {
+        "code": "SC2",
+        "name": "League One"
+      },
+      {
+        "code": "SC3",
+        "name": "League Two"
+      }
+    ]
+  },
+  {
+    "country": "Spagna",
+    "flag": "🇪🇸",
+    "leagues": [
+      {
+        "code": "SP1",
+        "name": "La Liga"
+      },
+      {
+        "code": "SP2",
+        "name": "Segunda Division"
+      }
+    ]
+  },
+  {
+    "country": "Germania",
+    "flag": "🇩🇪",
+    "leagues": [
+      {
+        "code": "D1",
+        "name": "Bundesliga"
+      },
+      {
+        "code": "D2",
+        "name": "2. Bundesliga"
+      }
+    ]
+  },
+  {
+    "country": "Francia",
+    "flag": "🇫🇷",
+    "leagues": [
+      {
+        "code": "F1",
+        "name": "Ligue 1"
+      },
+      {
+        "code": "F2",
+        "name": "Ligue 2"
+      }
+    ]
+  },
+  {
+    "country": "Paesi Bassi",
+    "flag": "🇳🇱",
+    "leagues": [
+      {
+        "code": "N1",
+        "name": "Eredivisie"
+      }
+    ]
+  },
+  {
+    "country": "Belgio",
+    "flag": "🇧🇪",
+    "leagues": [
+      {
+        "code": "B1",
+        "name": "Pro League"
+      }
+    ]
+  },
+  {
+    "country": "Portogallo",
+    "flag": "🇵🇹",
+    "leagues": [
+      {
+        "code": "P1",
+        "name": "Liga Portugal"
+      }
+    ]
+  },
+  {
+    "country": "Turchia",
+    "flag": "🇹🇷",
+    "leagues": [
+      {
+        "code": "T1",
+        "name": "Super Lig"
+      }
+    ]
+  },
+  {
+    "country": "Grecia",
+    "flag": "🇬🇷",
+    "leagues": [
+      {
+        "code": "G1",
+        "name": "Super League"
+      }
+    ]
+  }
+]
