@@ -1095,18 +1095,19 @@
       }).join("");
     }
 
-    function renderPickBox(title, pick) {
-      const body = pick
-        ? `
-          <div class="text-xs font-extrabold text-white leading-tight whitespace-nowrap">${pick.label}</div>
-          <div class="text-[9px] uppercase tracking-wider text-slate-400 leading-none mt-0.5">${pick.family}</div>
-          <div class="text-sm mt-0.5">${renderPctText(pick.pct)}</div>
-        `
+    function renderPickBox(title, picks) {
+      const body = (picks && picks.length)
+        ? picks.map(pk => `
+            <div class="flex items-center gap-1 text-xs whitespace-nowrap leading-snug">
+              <span class="font-extrabold text-white">${pk.label}:</span>
+              ${renderPctText(pk.pct)}
+            </div>
+          `).join("")
         : `<div class="text-sm text-slate-500 py-2">—</div>`;
       return `
-        <div class="px-3 py-1.5 rounded-xl bg-slate-900/90 border border-slate-700/80 text-center min-w-[104px]">
-          <div class="text-[10px] uppercase tracking-wider text-cyan-300 font-semibold whitespace-nowrap">${title}</div>
-          ${body}
+        <div class="px-3 py-1.5 rounded-xl bg-slate-900/90 border border-slate-700/80 min-w-[118px]">
+          <div class="text-[10px] uppercase tracking-wider text-cyan-300 font-semibold text-center mb-1 border-b border-slate-700/70 pb-0.5">${title}</div>
+          <div class="space-y-0.5">${body}</div>
         </div>
       `;
     }
@@ -1160,7 +1161,7 @@
         const isToday = m.date === todayStr;
         const picks = (typeof window.computeMatchTopPicks === "function")
           ? window.computeMatchTopPicks(m, state.selectedLeagueCode, state.resultsRows)
-          : { real: null, dixon: null };
+          : { real: [], dixon: [] };
         return `
           <div
             onclick="openMatchStats('${m.id}')"
@@ -1201,8 +1202,8 @@
                   <div class="text-sm mt-0.5">${renderPctText(m.diffForm)}</div>
                 </div>
 
-                ${renderPickBox("Top Reali", picks.real)}
-                ${renderPickBox("Top Dixon-Cole", picks.dixon)}
+                ${renderPickBox("Reali", picks.real)}
+                ${renderPickBox("Dixon-Cole", picks.dixon)}
               </div>
             </div>
           </div>

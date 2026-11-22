@@ -614,7 +614,7 @@
     };
   }
 
-  // ---- Giocata con la % più alta tra le famiglie DC, Over/Under, Multigol Totali ----
+  // ---- Migliori giocate (una per famiglia: DC, Over/Under, Multigol Totali) ----
   const TOP_PICK_FAMILIES = {
     "DC": "DC",
     "Over/Under": "O/U",
@@ -622,24 +622,27 @@
   };
   const topPicksCache = new WeakMap();
 
+  // Per ogni famiglia (DC, Over/Under, Multigol Totali) restituisce la giocata con % più alta
   function pickBestFromFamilies(families) {
-    let best = null;
-    for (const fam of families || []) {
-      const tag = TOP_PICK_FAMILIES[fam.title];
-      if (!tag) continue;
+    const out = [];
+    for (const title of Object.keys(TOP_PICK_FAMILIES)) {
+      const fam = (families || []).find(f => f.title === title);
+      if (!fam) continue;
       const items = fam.items ? fam.items : [...(fam.overItems || []), ...(fam.underItems || [])];
+      let best = null;
       for (const it of items) {
         if (!best || it.pct > best.pct) {
-          best = { label: it.label, pct: it.pct, family: tag };
+          best = { label: it.label, pct: it.pct, family: TOP_PICK_FAMILIES[title] };
         }
       }
+      if (best) out.push(best);
     }
-    return best;
+    return out;
   }
 
   // Usata dalla home: restituisce { real, dixon } per una partita
   window.computeMatchTopPicks = function (match, leagueCode, resultsRows) {
-    if (!match) return { real: null, dixon: null };
+    if (!match) return { real: [], dixon: [] };
 
     const canCache = Array.isArray(resultsRows);
     let cache = null;
