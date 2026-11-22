@@ -1,27 +1,48 @@
-name: Aggiorna Dati ComboGesss
+name: Aggiorna dati ComboGesss
 
 on:
+  # Ogni giorno alle 05:00 UTC (06:00 in inverno / 07:00 in estate in Italia)
   schedule:
-    - cron: "0 6 * * *" # Ogni giorno alle 06:00 UTC
+    - cron: "0 5 * * *"
+  # Pulsante "Run workflow" per lanciarlo a mano dalla scheda Actions
   workflow_dispatch:
 
+# Serve per poter salvare (commit) i file aggiornati nel repository
 permissions:
   contents: write
 
+# Evita due aggiornamenti contemporanei
+concurrency:
+  group: update-data
+  cancel-in-progress: false
+
 jobs:
-  update-data:
+  update:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - name: Scarica il repository
+        uses: actions/checkout@v4
+
+      - name: Installa Python
+        uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
-      - run: pip install requests pandas openpyxl
-      - run: python update_combogesss_data.py
-      - name: Commit e Push se ci sono novità
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Installa le librerie
+        run: pip install -r requirements.txt
+
+      - name: Scarica e crea i file Excel/CSV
+        run: python update_combogesss_data.py
+
+      - name: Salva i file aggiornati nel repository
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add data/
-          git diff --staged --quiet || git commit -m "chore: aggiorna dati football-data.co.uk"
-          git push
+          git add data
+          if git diff --cached --quiet; then
+            echo "Nessuna modifica: i dati sono già aggiornati."
+          else
+            git commit -m "Aggiornamento dati $(date -u +'%d/%m/%Y %H:%M') UTC"
+            git push
+          fi
