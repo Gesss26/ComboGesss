@@ -114,6 +114,42 @@
     `;
   }
 
+  function parseDateTimestamp(val) {
+    if (val === null || val === undefined || val === "") return 0;
+    if (typeof val === "number" && Number.isFinite(val)) {
+      const serialDays = Math.floor(val);
+      return Date.UTC(1899, 11, 30) + serialDays * 86400000;
+    }
+    const str = String(val).trim();
+    if (/^\d+(\.\d+)?$/.test(str)) {
+      return parseDateTimestamp(parseFloat(str));
+    }
+
+    // DD/MM/YYYY o DD/MM/YY o DD-MM-YYYY
+    const dmy = str.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})$/);
+    if (dmy) {
+      const day = parseInt(dmy[1], 10);
+      const month = parseInt(dmy[2], 10) - 1;
+      let year = parseInt(dmy[3], 10);
+      if (year < 100) year += year >= 70 ? 1900 : 2000;
+      const ts = Date.UTC(year, month, day);
+      return Number.isFinite(ts) ? ts : 0;
+    }
+
+    // YYYY-MM-DD
+    const ymd = str.match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})$/);
+    if (ymd) {
+      const year = parseInt(ymd[1], 10);
+      const month = parseInt(ymd[2], 10) - 1;
+      const day = parseInt(ymd[3], 10);
+      const ts = Date.UTC(year, month, day);
+      return Number.isFinite(ts) ? ts : 0;
+    }
+
+    const parsed = Date.parse(str);
+    return Number.isFinite(parsed) ? parsed : 0;
+  }
+
   function formatMatchDate(val) {
     if (val === null || val === undefined || val === "") return "Data N/D";
     if (typeof val === "number" && Number.isFinite(val)) {
@@ -159,21 +195,18 @@
     const rows = Array.isArray(resultsRows) ? resultsRows : [];
 
     return rows
-      .filter(r => {
+      .map((r, rowIndex) => {
         const div = String(r.Div || r.DivCode || "").trim().toUpperCase();
-        if (divTarget && div && div !== divTarget) return false;
-        const h = String(r.HomeTeam || r.Home || "").trim().toLowerCase();
-        const a = String(r.AwayTeam || r.Away || "").trim().toLowerCase();
-        const hg = Number(r.FTHG);
-        const ag = Number(r.FTAG);
-        return (h === target || a === target) && Number.isFinite(hg) && Number.isFinite(ag);
-      })
-      .map(r => {
+        if (divTarget && div && div !== divTarget) return null;
         const rawHome = String(r.HomeTeam || r.Home || "").trim();
         const rawAway = String(r.AwayTeam || r.Away || "").trim();
-        const isHome = rawHome.toLowerCase() === target;
+        const h = rawHome.toLowerCase();
+        const a = rawAway.toLowerCase();
         const hg = Number(r.FTHG);
         const ag = Number(r.FTAG);
+        if ((h !== target && a !== target) || !Number.isFinite(hg) || !Number.isFinite(ag)) return null;
+
+        const isHome = h === target;
         const gf = isHome ? hg : ag;
         const ga = isHome ? ag : hg;
         const totalGoals = hg + ag;
@@ -185,6 +218,8 @@
         const xgf = isHome ? homeXG : awayXG;
 
         return {
+          rowIndex,
+          dateTs: parseDateTimestamp(r.Date),
           isHome,
           opponent: isHome ? rawAway : rawHome,
           homeName: rawHome,
@@ -199,6 +234,11 @@
           outcome,
           xgf: Number.isFinite(xgf) ? xgf : null
         };
+      })
+      .filter(Boolean)
+      .sort((a, b) => {
+        if (a.dateTs !== b.dateTs) return a.dateTs - b.dateTs;
+        return a.rowIndex - b.rowIndex;
       });
   }
 
@@ -426,11 +466,12 @@
       leagueAvgAway = Math.max(0.5, leagueRows.reduce((s, r) => s + Number(r.FTAG), 0) / leagueRows.length);
     }
 
-    const homeAtt = Math.max(0.45, Math.min(2.2, homeMetrics.avgScored / Math.max(0.5, (leagueAvgHome + leagueAvgAway) / 2)));
-    const awayDef = Math.max(0.45, Math.min(2.2, awayMetrics.avgConceded / Math.max(0.5, (leagueAvgHome + leagueAvgAway) / 2)));
+    const baseAvg = Math.max(0.5, (leagueAvgHome + leagueAvgAway) / 2);
+    const homeAtt = Math.max(0.45, Math.min(2.2, homeMetrics.avgScored / baseAvg));
+    const awayDef = Math.max(0.45, Math.min(2.2, awayMetrics.avgConceded / baseAvg));
 
-    const awayAtt = Math.max(0.45, Math.min(2.2, awayMetrics.avgScored / Math.max(0.5, (leagueAvgHome + leagueAvgAway) / 2)));
-    const homeDef = Math.max(0.45, Math.min(2.2, homeMetrics.avgConceded / Math.max(0.5, (leagueAvgHome + leagueAvgAway) / 2)));
+    const awayAtt = Math.max(0.45, Math.min(2.2, awayMetrics.avgScored / baseAvg));
+    const homeDef = Math.max(0.45, Math.min(2.2, homeMetrics.avgConceded / baseAvg));
 
     const lambdaHome = Math.max(0.25, Math.min(4.5, leagueAvgHome * homeAtt * awayDef));
     const lambdaAway = Math.max(0.25, Math.min(4.5, leagueAvgAway * awayAtt * homeDef));
@@ -516,6 +557,7 @@
           gf: 0,
           ga: 0,
           gd: 0,
+          avgGoals: 0,
           points: 0
         });
       }
@@ -568,7 +610,8 @@
 
     const list = Array.from(table.values()).map(item => ({
       ...item,
-      gd: item.gf - item.ga
+      gd: item.gf - item.ga,
+      avgGoals: item.played > 0 ? Number(((item.gf + item.ga) / item.played).toFixed(2)) : 0
     }));
 
     list.sort((a, b) => {
@@ -605,17 +648,17 @@
         <tr class="border-b border-slate-800/70 last:border-b-0 transition ${
           isHighlighted ? "standings-team-gold text-amber-200 font-bold" : "hover:bg-slate-800/40 text-slate-200"
         }">
-          <td class="py-2 pl-2 pr-1.5 text-xs ${isHighlighted ? "text-amber-300 font-extrabold" : "text-slate-400"}">${pos}</td>
+          <td class="py-2 pl-2 pr-1 text-xs ${isHighlighted ? "text-amber-300 font-extrabold" : "text-slate-400"}">${pos}</td>
           <td class="py-2 px-1.5 text-xs">
-            <div class="flex items-center justify-between gap-1.5">
+            <div class="flex items-center justify-between gap-1">
               <span class="truncate ${isHighlighted ? "text-amber-200 font-extrabold" : "text-white font-semibold"}">${row.name}</span>
               ${badgeRole ? `<span class="text-[9px] px-1.5 py-0.5 rounded bg-amber-400/20 text-amber-300 border border-amber-400/50 font-extrabold shrink-0">${badgeRole}</span>` : ""}
             </div>
           </td>
           <td class="py-2 px-1 text-center text-xs ${isHighlighted ? "text-amber-200" : "text-slate-400"}">${row.played}</td>
-          <td class="py-2 px-1 text-center text-xs ${isHighlighted ? "text-amber-200" : "text-slate-400"}">${row.won}</td>
-          <td class="py-2 px-1 text-center text-xs ${isHighlighted ? "text-amber-200" : "text-slate-400"}">${row.drawn}</td>
-          <td class="py-2 px-1 text-center text-xs ${isHighlighted ? "text-amber-200" : "text-slate-400"}">${row.lost}</td>
+          <td class="py-2 px-1 text-center text-xs ${isHighlighted ? "text-emerald-300" : "text-slate-300"}">${row.gf}</td>
+          <td class="py-2 px-1 text-center text-xs ${isHighlighted ? "text-rose-300" : "text-slate-300"}">${row.ga}</td>
+          <td class="py-2 px-1 text-center text-xs ${isHighlighted ? "text-amber-200" : "text-slate-300"}">${row.avgGoals.toFixed(2)}</td>
           <td class="py-2 px-1 text-center text-xs ${isHighlighted ? "text-amber-200" : "text-slate-300"}">${row.gd > 0 ? `+${row.gd}` : row.gd}</td>
           <td class="py-2 pl-1 pr-2 text-right text-xs font-extrabold ${isHighlighted ? "text-amber-300" : "text-emerald-400"}">${row.points}</td>
         </tr>
@@ -636,12 +679,12 @@
           <table class="w-full text-left border-collapse">
             <thead>
               <tr class="border-b border-slate-700/80 text-[10px] uppercase tracking-wider text-slate-400">
-                <th class="py-1.5 pl-2 pr-1.5">#</th>
+                <th class="py-1.5 pl-2 pr-1">#</th>
                 <th class="py-1.5 px-1.5">Squadra</th>
                 <th class="py-1.5 px-1 text-center" title="Partite giocate">G</th>
-                <th class="py-1.5 px-1 text-center" title="Vinte">V</th>
-                <th class="py-1.5 px-1 text-center" title="Pareggiate">P</th>
-                <th class="py-1.5 px-1 text-center" title="Perse">S</th>
+                <th class="py-1.5 px-1 text-center" title="Gol Fatti">GF</th>
+                <th class="py-1.5 px-1 text-center" title="Gol Subiti">GS</th>
+                <th class="py-1.5 px-1 text-center" title="Media Gol partita">Media</th>
                 <th class="py-1.5 px-1 text-center" title="Differenza reti">DR</th>
                 <th class="py-1.5 pl-1 pr-2 text-right" title="Punti">Pt</th>
               </tr>
@@ -726,7 +769,13 @@
       `;
     }
 
-    const itemsHtml = [...histList].reverse().map(g => {
+    // Dalla più recente alla meno recente
+    const newestFirst = [...histList].sort((a, b) => {
+      if (b.dateTs !== a.dateTs) return b.dateTs - a.dateTs;
+      return b.rowIndex - a.rowIndex;
+    });
+
+    const itemsHtml = newestFirst.map(g => {
       const rowCls = g.outcome === "W"
         ? "hist-win text-emerald-100"
         : g.outcome === "D"
@@ -740,13 +789,12 @@
         : "bg-red-500 text-white";
 
       const label = g.outcome === "W" ? "V" : g.outcome === "D" ? "P" : "S";
-      const matchLine = g.isHome ? `${g.homeName} - ${g.awayName}` : `${g.homeName} - ${g.awayName}`;
 
       return `
         <div class="rounded-xl border px-3 py-2 flex items-center justify-between gap-2 ${rowCls}">
           <div class="min-w-0">
             <div class="text-[11px] font-semibold opacity-85">${g.date || "Data N/D"} • ${g.isHome ? "Casa" : "Trasf."}</div>
-            <div class="text-xs font-bold truncate">${matchLine}</div>
+            <div class="text-xs font-bold truncate">${g.homeName} - ${g.awayName}</div>
           </div>
           <div class="flex items-center gap-2 shrink-0">
             <span class="text-xs font-extrabold px-2 py-0.5 rounded bg-slate-950/60 border border-white/10">
@@ -765,9 +813,9 @@
         <div class="flex items-center justify-between border-b border-slate-800 pb-2">
           <div>
             <h4 class="text-sm font-extrabold ${accentClass}">${teamName}</h4>
-            <p class="text-[11px] text-slate-400">Storico giornate passate</p>
+            <p class="text-[11px] text-slate-400">Dalla più recente alla meno recente</p>
           </div>
-          <span class="text-[11px] font-bold text-slate-300">${histList.length} gare</span>
+          <span class="text-[11px] font-bold text-slate-300">${newestFirst.length} gare</span>
         </div>
         <div class="space-y-2 max-h-[560px] overflow-y-auto pr-1">
           ${itemsHtml}
