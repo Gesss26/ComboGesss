@@ -895,6 +895,63 @@
     `;
   }
 
+  // Tab "Frequenza Gol": quante volte la squadra ha segnato N gol (in casa e fuori)
+  const GOAL_BUCKETS = [
+    { label: "1 Gol", test: g => g === 1 },
+    { label: "2 Gol", test: g => g === 2 },
+    { label: "3 Gol", test: g => g === 3 },
+    { label: "4 Gol", test: g => g === 4 },
+    { label: "5 Gol", test: g => g === 5 },
+    { label: "+5 Gol", test: g => g > 5 }
+  ];
+
+  function renderGoalFreqColumn(teamName, histList, accentClass, barClass, sideLabel) {
+    const homeGames = histList.filter(g => g.isHome);
+    const awayGames = histList.filter(g => !g.isHome);
+
+    const rows = GOAL_BUCKETS.map(b => {
+      const h = homeGames.filter(g => b.test(g.gf)).length;
+      const a = awayGames.filter(g => b.test(g.gf)).length;
+      return { label: b.label, h, a };
+    });
+
+    const cell = (count, total) => {
+      const pct = total ? (count / total) * 100 : 0;
+      return `
+        <div class="space-y-1">
+          <div class="flex items-baseline justify-between gap-1">
+            <span class="text-base sm:text-lg font-black text-white">${count}</span>
+            <span class="text-[10px] text-slate-400">${total ? toPct(pct) : "—"}</span>
+          </div>
+          <div class="h-1.5 rounded-full bg-slate-800 overflow-hidden">
+            <div class="h-full rounded-full ${barClass}" style="width:${pct.toFixed(1)}%"></div>
+          </div>
+        </div>
+      `;
+    };
+
+    return `
+      <div class="rounded-2xl bg-slate-900/85 border border-slate-800 p-3 sm:p-4 space-y-3 min-w-0">
+        <div class="border-b border-slate-800 pb-2">
+          <div class="text-[10px] uppercase tracking-wider text-slate-500 font-bold">${sideLabel}</div>
+          <h4 class="text-sm font-extrabold truncate ${accentClass}">${teamName}</h4>
+          <p class="text-[11px] text-slate-400">${homeGames.length} in casa • ${awayGames.length} fuori • ${histList.length} totali</p>
+        </div>
+
+        <div class="grid grid-cols-[auto_1fr_1fr] gap-x-2 sm:gap-x-3 gap-y-2.5 items-center">
+          <div></div>
+          <div class="text-[10px] sm:text-[11px] font-extrabold uppercase tracking-wider text-slate-300 text-center">🏠 In casa</div>
+          <div class="text-[10px] sm:text-[11px] font-extrabold uppercase tracking-wider text-slate-300 text-center">✈️ Fuori</div>
+          ${rows.map(r => `
+            <div class="text-xs font-extrabold text-amber-300 whitespace-nowrap">${r.label}</div>
+            ${cell(r.h, homeGames.length)}
+            ${cell(r.a, awayGames.length)}
+          `).join("")}
+        </div>
+      </div>
+    `;
+  }
+
   function ensureOverlayElement() {
     ensureColorStyles();
     let el = document.getElementById(OVERLAY_ID);
@@ -985,7 +1042,7 @@
 
     content.innerHTML = `
       <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-        <!-- Colonna Sinistra: Partita + 3 Tab -->
+        <!-- Colonna Sinistra: Partita + 4 Tab -->
         <div class="lg:col-span-7 space-y-5">
           <!-- Header Partita -->
           <div class="rounded-2xl bg-gradient-to-br from-slate-900 via-slate-900 to-emerald-950/30 border border-slate-700/70 p-5 sm:p-6 shadow-2xl">
@@ -1066,7 +1123,7 @@
             </div>
           </div>
 
-          <!-- Barra 3 Tab -->
+          <!-- Barra 4 Tab -->
           <div class="flex flex-wrap items-center gap-2">
             <button type="button" data-cg-tab-btn="reali" onclick="switchMatchStatsTab('reali')" class="px-3.5 py-2 rounded-xl text-xs sm:text-sm font-extrabold bg-emerald-500/20 text-emerald-300 border border-emerald-400/60 transition cursor-pointer">
               📊 Statistiche Reali
@@ -1076,6 +1133,9 @@
             </button>
             <button type="button" data-cg-tab-btn="storico" onclick="switchMatchStatsTab('storico')" class="px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold bg-slate-900/90 text-slate-300 border border-slate-800 hover:border-slate-600 transition cursor-pointer">
               🕒 Storico Partite
+            </button>
+            <button type="button" data-cg-tab-btn="frequenza" onclick="switchMatchStatsTab('frequenza')" class="px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold bg-slate-900/90 text-slate-300 border border-slate-800 hover:border-slate-600 transition cursor-pointer">
+              ⚽ Frequenza Gol
             </button>
           </div>
 
@@ -1098,6 +1158,14 @@
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
               ${renderHistoryColumn(match.home, homeHist, "text-emerald-300")}
               ${renderHistoryColumn(match.away, awayHist, "text-sky-300")}
+            </div>
+          </div>
+
+          <!-- Tab 4: Frequenza Gol (schermo diviso in 2: casa a sinistra, trasferta a destra) -->
+          <div data-cg-tab-panel="frequenza" class="hidden">
+            <div class="grid grid-cols-2 gap-2 sm:gap-4">
+              ${renderGoalFreqColumn(match.home, homeHist, "text-emerald-300", "bg-emerald-400", "Squadra di casa")}
+              ${renderGoalFreqColumn(match.away, awayHist, "text-sky-300", "bg-sky-400", "Squadra in trasferta")}
             </div>
           </div>
         </div>

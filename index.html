@@ -89,6 +89,44 @@
       animation: cgBombBounce 1.1s infinite ease-in-out;
     }
 
+    /* Partite della data odierna: bordo verde */
+    .today-match {
+      border-color: #22c55e !important;
+      box-shadow: 0 0 0 1px rgba(34, 197, 94, 0.35), 0 0 14px rgba(34, 197, 94, 0.18);
+    }
+
+    /* Interruttore doppia visualizzazione */
+    .view-switch {
+      position: relative;
+      width: 44px;
+      height: 24px;
+      border-radius: 999px;
+      background: #1e293b;
+      border: 1px solid #334155;
+      transition: background 0.2s, border-color 0.2s;
+      cursor: pointer;
+      flex-shrink: 0;
+    }
+    .view-switch::after {
+      content: "";
+      position: absolute;
+      top: 2px;
+      left: 2px;
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: #e2e8f0;
+      transition: transform 0.2s, background 0.2s;
+    }
+    .view-switch[aria-checked="true"] {
+      background: rgba(16, 185, 129, 0.35);
+      border-color: rgba(52, 211, 153, 0.7);
+    }
+    .view-switch[aria-checked="true"]::after {
+      transform: translateX(20px);
+      background: #34d399;
+    }
+
     ::-webkit-scrollbar { width: 8px; height: 8px; }
     ::-webkit-scrollbar-track { background: #0b0f17; }
     ::-webkit-scrollbar-thumb { background: #263248; border-radius: 999px; }
@@ -114,6 +152,11 @@
         </div>
       </div>
 
+      <div class="flex flex-col items-end gap-2 ml-auto">
+      <div id="liveClock" class="text-right leading-tight">
+        <div id="liveClockDate" class="text-[11px] uppercase tracking-wider text-slate-400"></div>
+        <div id="liveClockTime" class="text-lg font-extrabold text-emerald-300 tabular-nums"></div>
+      </div>
       <div class="flex items-center gap-2">
         <button id="reloadDataBtn" type="button" onclick="autoLoadComboGesssData(true)" class="px-3 py-2 rounded-lg text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition">
           🔄 Aggiorna Dati
@@ -122,6 +165,7 @@
           📥 Carica Excel/CSV
           <input id="manualFileInput" type="file" accept=".xlsx,.xls,.csv" multiple class="hidden" onchange="handleManualUpload(event)" />
         </label>
+      </div>
       </div>
     </div>
   </header>
@@ -160,6 +204,16 @@
             <select id="roundSelect" onchange="selectRound(this.value)" class="px-3 py-1.5 rounded-lg bg-slate-900 text-xs font-semibold text-white border border-slate-700 focus:outline-none focus:border-emerald-500"></select>
             <button type="button" onclick="changeRound(1)" class="px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs font-bold text-slate-200 border border-slate-700">▶</button>
           </div>
+        </div>
+
+        <!-- Interruttore doppia visualizzazione -->
+        <div class="mt-3 pt-3 border-t border-slate-800 flex flex-wrap items-center gap-3 text-xs font-semibold">
+          <span id="viewLabelForm" class="transition">📊 Differenza forma</span>
+          <button id="viewModeSwitch" type="button" role="switch" aria-checked="false" aria-label="Cambia visualizzazione" onclick="toggleViewMode()" class="view-switch"></button>
+          <span id="viewLabelChrono" class="transition">🕒 Ordine cronologico</span>
+          <span class="text-[11px] font-normal text-slate-500 flex items-center gap-1.5">
+            <span class="inline-block w-3 h-3 rounded-sm border-2 border-green-500"></span> partite di oggi
+          </span>
         </div>
       </div>
 
@@ -312,8 +366,58 @@
       selectedRound: 1,
       resultsRows: [],
       fixturesRows: [],
-      roundsByLeague: {}
+      roundsByLeague: {},
+      viewMode: "form" // "form" = differenza forma decrescente, "chrono" = cronologico crescente
     };
+
+    function getTodayStr() {
+      const d = new Date();
+      return `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}/${d.getFullYear()}`;
+    }
+
+    function matchSortKey(m) {
+      const dm = String(m.date || "").match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+      if (!dm) return Number.POSITIVE_INFINITY;
+      const tm = String(m.time || "").match(/^(\d{1,2}):(\d{2})/);
+      const hh = tm ? parseInt(tm[1], 10) : 0;
+      const mi = tm ? parseInt(tm[2], 10) : 0;
+      return Date.UTC(parseInt(dm[3], 10), parseInt(dm[2], 10) - 1, parseInt(dm[1], 10), hh, mi);
+    }
+
+    function toggleViewMode() {
+      state.viewMode = state.viewMode === "form" ? "chrono" : "form";
+      renderMatches();
+    }
+
+    function updateViewSwitchUI() {
+      const sw = document.getElementById("viewModeSwitch");
+      if (!sw) return;
+      const chrono = state.viewMode === "chrono";
+      sw.setAttribute("aria-checked", chrono ? "true" : "false");
+      const lf = document.getElementById("viewLabelForm");
+      const lc = document.getElementById("viewLabelChrono");
+      if (lf) lf.className = "transition " + (chrono ? "text-slate-500" : "text-emerald-300");
+      if (lc) lc.className = "transition " + (chrono ? "text-emerald-300" : "text-slate-500");
+    }
+
+    let lastClockDay = getTodayStr();
+    function updateClock() {
+      const now = new Date();
+      const dateEl = document.getElementById("liveClockDate");
+      const timeEl = document.getElementById("liveClockTime");
+      if (dateEl) {
+        dateEl.textContent = now.toLocaleDateString("it-IT", { weekday: "long", day: "2-digit", month: "2-digit", year: "numeric" });
+      }
+      if (timeEl) {
+        timeEl.textContent = now.toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+      }
+      // A cambio giorno aggiorna i bordi verdi
+      const today = getTodayStr();
+      if (today !== lastClockDay) {
+        lastClockDay = today;
+        renderMatches();
+      }
+    }
 
     function clampPct(val) {
       const n = Number(val);
@@ -854,9 +958,17 @@
         `<option value="${r.roundNumber}" ${r.roundNumber === (roundObj && roundObj.roundNumber) ? "selected" : ""}>${r.label}</option>`
       ).join("");
 
-      const matches = roundObj ? roundObj.matches : [];
+      let matches = roundObj ? [...roundObj.matches] : [];
+      if (state.viewMode === "chrono") {
+        matches.sort((a, b) => matchSortKey(a) - matchSortKey(b));
+      } else {
+        matches.sort((a, b) => b.diffForm - a.diffForm);
+      }
+      updateViewSwitchUI();
+      const orderLabel = state.viewMode === "chrono" ? "ordine cronologico" : "differenza di forma";
+      const todayStr = getTodayStr();
       document.getElementById("currentLeagueSubtitle").textContent =
-        `${roundObj ? roundObj.label : "Giornata"} • ${matches.length} partite • Clicca una card per le statistiche`;
+        `${roundObj ? roundObj.label : "Giornata"} • ${matches.length} partite • ${orderLabel} • Clicca una card per le statistiche`;
 
       const listEl = document.getElementById("matchesList");
       if (!matches.length) {
@@ -867,13 +979,14 @@
       listEl.innerHTML = matches.map(m => {
         const dateTimeStr = [m.date, m.time].filter(Boolean).join(" • ");
         const isDiffBomb = clampPct(m.diffForm) >= 90;
+        const isToday = m.date === todayStr;
         return `
           <div
             onclick="openMatchStats('${m.id}')"
             role="button"
             tabindex="0"
             onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openMatchStats('${m.id}');}"
-            class="glass-card rounded-xl p-3.5 hover:border-emerald-400/50 hover:bg-slate-900/80 transition cursor-pointer"
+            class="glass-card rounded-xl p-3.5 hover:border-emerald-400/50 hover:bg-slate-900/80 transition cursor-pointer ${isToday ? "today-match" : ""}"
           >
             <div class="flex flex-wrap items-center justify-between gap-3">
               <div class="text-left flex-1 min-w-[210px]">
@@ -981,6 +1094,8 @@
     }
 
     window.addEventListener("DOMContentLoaded", () => {
+      updateClock();
+      setInterval(updateClock, 1000);
       autoLoadComboGesssData();
     });
   </script>
