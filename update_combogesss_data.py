@@ -1,3 +1,4 @@
+import json
 import os
 import re
 from urllib.parse import urljoin
@@ -5,21 +6,45 @@ import requests
 import pandas as pd
 
 BASE_URL = "https://www.football-data.co.uk/"
-SEASON = "2627"  # Stagione 2026/2027 (aggiornabile ogni estate)
+SEASON = "2627"  # Stagione 2026/2027
 OUTPUT_DIR = "data"
+EURO_EXCEL_NAME = "all-euro-data-2026-2027.xlsx"
 
-# Codici top 5 campionati europei + seconde divisioni su football-data.co.uk
+# Mappa completa: Codice -> (Nazione, Bandiera, Nome Campionato)
 LEAGUES = {
-    "I1": ("Italia", "Serie A"),
-    "I2": ("Italia", "Serie B"),
-    "E0": ("Inghilterra", "Premier League"),
-    "E1": ("Inghilterra", "Championship"),
-    "SP1": ("Spagna", "La Liga"),
-    "SP2": ("Spagna", "Segunda Division"),
-    "D1": ("Germania", "Bundesliga"),
-    "D2": ("Germania", "2. Bundesliga"),
-    "F1": ("Francia", "Ligue 1"),
-    "F2": ("Francia", "Ligue 2"),
+    # Italia
+    "I1": ("Italia", "🇮🇹", "Serie A"),
+    "I2": ("Italia", "🇮🇹", "Serie B"),
+    # Inghilterra
+    "E0": ("Inghilterra", "🏴󠁧󠁢󠁥󠁮󠁧󠁿", "Premier League"),
+    "E1": ("Inghilterra", "🏴󠁧󠁢󠁥󠁮󠁧󠁿", "Championship"),
+    "E2": ("Inghilterra", "🏴󠁧󠁢󠁥󠁮󠁧󠁿", "League One"),
+    "E3": ("Inghilterra", "🏴󠁧󠁢󠁥󠁮󠁧󠁿", "League Two"),
+    "EC": ("Inghilterra", "🏴󠁧󠁢󠁥󠁮󠁧󠁿", "National League"),
+    # Scozia
+    "SC0": ("Scozia", "🏴󠁧󠁢󠁳󠁣󠁴󠁿", "Premiership"),
+    "SC1": ("Scozia", "🏴󠁧󠁢󠁳󠁣󠁴󠁿", "Championship"),
+    "SC2": ("Scozia", "🏴󠁧󠁢󠁳󠁣󠁴󠁿", "League One"),
+    "SC3": ("Scozia", "🏴󠁧󠁢󠁳󠁣󠁴󠁿", "League Two"),
+    # Spagna
+    "SP1": ("Spagna", "🇪🇸", "La Liga"),
+    "SP2": ("Spagna", "🇪🇸", "Segunda Division"),
+    # Germania
+    "D1": ("Germania", "🇩🇪", "Bundesliga"),
+    "D2": ("Germania", "🇩🇪", "2. Bundesliga"),
+    # Francia
+    "F1": ("Francia", "🇫🇷", "Ligue 1"),
+    "F2": ("Francia", "🇫🇷", "Ligue 2"),
+    # Paesi Bassi
+    "N1": ("Paesi Bassi", "🇳🇱", "Eredivisie"),
+    # Belgio
+    "B1": ("Belgio", "🇧🇪", "Pro League"),
+    # Portogallo
+    "P1": ("Portogallo", "🇵🇹", "Liga Portugal"),
+    # Turchia
+    "T1": ("Turchia", "🇹🇷", "Super Lig"),
+    # Grecia
+    "G1": ("Grecia", "🇬🇷", "Super League"),
 }
 
 HEADERS = {
@@ -29,6 +54,32 @@ HEADERS = {
 
 def ensure_dir(path: str) -> None:
     os.makedirs(path, exist_ok=True)
+
+
+def build_countries_catalog() -> list[dict]:
+    """Raggruppa i campionati per nazione includendo bandiera e codici."""
+    grouped: dict[str, dict] = {}
+    for code, (country, flag, league_name) in LEAGUES.items():
+        if country not in grouped:
+            grouped[country] = {
+                "country": country,
+                "flag": flag,
+                "leagues": [],
+            }
+        grouped[country]["leagues"].append({
+            "code": code,
+            "name": league_name,
+        })
+    return list(grouped.values())
+
+
+def export_countries_catalog(out_dir: str) -> list[dict]:
+    catalog = build_countries_catalog()
+    out_path = os.path.join(out_dir, "countries_leagues.json")
+    with open(out_path, "w", encoding="utf-8") as f:
+        json.dump(catalog, f, ensure_ascii=False, indent=2)
+    print(f"[OK] Esportato catalogo nazioni/campionati: {out_path}")
+    return catalog
 
 
 def download_file(url: str, dest_path: str) -> bool:
@@ -50,7 +101,6 @@ def download_fixtures_excel(dest_path: str) -> None:
     if download_file(direct_fixtures_url, dest_path):
         return
 
-    # Fallback: cerca il link al file .xlsx o .csv dentro matches.php
     try:
         matches_page = urljoin(BASE_URL, "matches.php")
         resp = requests.get(matches_page, headers=HEADERS, timeout=30)
@@ -65,16 +115,36 @@ def download_fixtures_excel(dest_path: str) -> None:
         print(f"[ERRORE] Fallback matches.php fallito: {exc}")
 
 
+def sync_euro_excel(out_dir: str) -> None:
+    """Scarica o legge all-euro-data-2026-2027.xlsx e rileva eventuali codici/fogli extra."""
+    local_excel = os.path.join(out_dir, EURO_EXCEL_NAME)
+    if not os.path.exists(local_excel):
+        candidate_url = urljoin(BASE_URL, f"mmz4281/{SEASON}/{EURO_EXCEL_NAME}")
+        download_file(candidate_url, local_excel)
+
+    if os.path.exists(local_excel):
+        try:
+            xl = pd.ExcelFile(local_excel)
+            print(f"[INFO] Fogli trovati in {local_excel}: {xl.sheet_names}")
+            for sheet in xl.sheet_names:
+                code = sheet.strip().upper()
+                if code not in LEAGUES:
+                    print(f"[AVVISO] Foglio/codice non mappato in LEAGUES: '{sheet}'")
+        except Exception as exc:
+            print(f"[AVVISO] Impossibile leggere {local_excel}: {exc}")
+
+
 def download_leagues_data(season: str, out_dir: str) -> None:
     """Scarica i CSV di tutti i campionati configurati e crea un file combinato."""
     all_frames = []
-    for code, (country, league_name) in LEAGUES.items():
+    for code, (country, flag, league_name) in LEAGUES.items():
         url = f"{BASE_URL}mmz4281/{season}/{code}.csv"
         csv_path = os.path.join(out_dir, f"{code}.csv")
         if download_file(url, csv_path):
             try:
                 df = pd.read_csv(csv_path, encoding="utf-8-sig", on_bad_lines="skip")
                 df["Country"] = country
+                df["Flag"] = flag
                 df["LeagueName"] = league_name
                 df["DivCode"] = code
                 all_frames.append(df)
@@ -91,7 +161,9 @@ def download_leagues_data(season: str, out_dir: str) -> None:
 def main() -> None:
     ensure_dir(OUTPUT_DIR)
     print("=== Aggiornamento dati ComboGesss ===")
+    export_countries_catalog(OUTPUT_DIR)
     download_fixtures_excel(os.path.join(OUTPUT_DIR, "fixtures.xlsx"))
+    sync_euro_excel(OUTPUT_DIR)
     download_leagues_data(SEASON, OUTPUT_DIR)
     print("=== Completato ===")
 
