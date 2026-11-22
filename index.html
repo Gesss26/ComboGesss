@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>ComboGesss — Statistiche Calcio Top 5 & Serie Minori</title>
+  <title>ComboGesss — Statistiche Calcio Europee</title>
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚽</text></svg>" />
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -107,7 +107,7 @@
           <div class="flex items-center gap-2">
             <h1 class="text-xl font-extrabold tracking-tight text-white">ComboGesss</h1>
             <span class="text-[11px] uppercase tracking-wider px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
-              Top 5 + Serie B
+              Europa 2026/27
             </span>
           </div>
           <p id="dataStatusText" class="text-xs text-slate-400">Inizializzazione dati in corso...</p>
@@ -133,12 +133,12 @@
     <section class="lg:col-span-3 space-y-3">
       <div class="flex items-center justify-between">
         <h2 class="text-xs font-bold uppercase tracking-wider text-slate-400">1. Nazioni</h2>
-        <span class="text-[11px] text-slate-500">Seleziona paese</span>
+        <span id="countriesSummaryLabel" class="text-[11px] text-slate-500">Seleziona paese</span>
       </div>
-      <div id="countriesList" class="space-y-2"></div>
+      <div id="countriesList" class="space-y-2 max-h-[75vh] overflow-y-auto pr-1"></div>
     </section>
 
-    <!-- Colonna 2: Lega A / Lega B della nazione selezionata -->
+    <!-- Colonna 2: Campionati della nazione selezionata -->
     <section class="lg:col-span-3 space-y-3">
       <div class="flex items-center justify-between">
         <h2 class="text-xs font-bold uppercase tracking-wider text-slate-400">2. Campionati</h2>
@@ -168,15 +168,15 @@
   </main>
 
   <script>
-    const NATIONS = [
+    const BASE_NATIONS = [
       {
         id: "Italia",
         name: "Italia",
         flagUrl: "https://flagcdn.com/w40/it.png",
         emojiFlag: "🇮🇹",
         leagues: [
-          { code: "I1", tier: "Lega A", name: "Serie A", matchesPerRound: 10 },
-          { code: "I2", tier: "Lega B", name: "Serie B", matchesPerRound: 10 }
+          { code: "I1", tier: "Serie A", name: "Serie A", matchesPerRound: 10 },
+          { code: "I2", tier: "Serie B", name: "Serie B", matchesPerRound: 10 }
         ]
       },
       {
@@ -185,8 +185,23 @@
         flagUrl: "https://flagcdn.com/w40/gb-eng.png",
         emojiFlag: "🏴󠁧󠁢󠁥󠁮󠁧󠁿",
         leagues: [
-          { code: "E0", tier: "Lega A", name: "Premier League", matchesPerRound: 10 },
-          { code: "E1", tier: "Lega B", name: "Championship", matchesPerRound: 12 }
+          { code: "E0", tier: "1ª Div.", name: "Premier League", matchesPerRound: 10 },
+          { code: "E1", tier: "2ª Div.", name: "Championship", matchesPerRound: 12 },
+          { code: "E2", tier: "3ª Div.", name: "League One", matchesPerRound: 12 },
+          { code: "E3", tier: "4ª Div.", name: "League Two", matchesPerRound: 12 },
+          { code: "EC", tier: "5ª Div.", name: "National League", matchesPerRound: 12 }
+        ]
+      },
+      {
+        id: "Scozia",
+        name: "Scozia",
+        flagUrl: "https://flagcdn.com/w40/gb-sct.png",
+        emojiFlag: "🏴󠁧󠁢󠁳󠁣󠁴󠁿",
+        leagues: [
+          { code: "SC0", tier: "1ª Div.", name: "Premiership", matchesPerRound: 6 },
+          { code: "SC1", tier: "2ª Div.", name: "Championship", matchesPerRound: 5 },
+          { code: "SC2", tier: "3ª Div.", name: "League One", matchesPerRound: 5 },
+          { code: "SC3", tier: "4ª Div.", name: "League Two", matchesPerRound: 5 }
         ]
       },
       {
@@ -195,8 +210,8 @@
         flagUrl: "https://flagcdn.com/w40/es.png",
         emojiFlag: "🇪🇸",
         leagues: [
-          { code: "SP1", tier: "Lega A", name: "La Liga", matchesPerRound: 10 },
-          { code: "SP2", tier: "Lega B", name: "Segunda Division", matchesPerRound: 11 }
+          { code: "SP1", tier: "1ª Div.", name: "La Liga", matchesPerRound: 10 },
+          { code: "SP2", tier: "2ª Div.", name: "Segunda Division", matchesPerRound: 11 }
         ]
       },
       {
@@ -205,8 +220,8 @@
         flagUrl: "https://flagcdn.com/w40/de.png",
         emojiFlag: "🇩🇪",
         leagues: [
-          { code: "D1", tier: "Lega A", name: "Bundesliga", matchesPerRound: 9 },
-          { code: "D2", tier: "Lega B", name: "2. Bundesliga", matchesPerRound: 9 }
+          { code: "D1", tier: "1ª Div.", name: "Bundesliga", matchesPerRound: 9 },
+          { code: "D2", tier: "2ª Div.", name: "2. Bundesliga", matchesPerRound: 9 }
         ]
       },
       {
@@ -215,11 +230,72 @@
         flagUrl: "https://flagcdn.com/w40/fr.png",
         emojiFlag: "🇫🇷",
         leagues: [
-          { code: "F1", tier: "Lega A", name: "Ligue 1", matchesPerRound: 9 },
-          { code: "F2", tier: "Lega B", name: "Ligue 2", matchesPerRound: 9 }
+          { code: "F1", tier: "1ª Div.", name: "Ligue 1", matchesPerRound: 9 },
+          { code: "F2", tier: "2ª Div.", name: "Ligue 2", matchesPerRound: 9 }
+        ]
+      },
+      {
+        id: "Paesi Bassi",
+        name: "Paesi Bassi",
+        flagUrl: "https://flagcdn.com/w40/nl.png",
+        emojiFlag: "🇳🇱",
+        leagues: [
+          { code: "N1", tier: "1ª Div.", name: "Eredivisie", matchesPerRound: 9 }
+        ]
+      },
+      {
+        id: "Belgio",
+        name: "Belgio",
+        flagUrl: "https://flagcdn.com/w40/be.png",
+        emojiFlag: "🇧🇪",
+        leagues: [
+          { code: "B1", tier: "1ª Div.", name: "Pro League", matchesPerRound: 8 }
+        ]
+      },
+      {
+        id: "Portogallo",
+        name: "Portogallo",
+        flagUrl: "https://flagcdn.com/w40/pt.png",
+        emojiFlag: "🇵🇹",
+        leagues: [
+          { code: "P1", tier: "1ª Div.", name: "Liga Portugal", matchesPerRound: 9 }
+        ]
+      },
+      {
+        id: "Turchia",
+        name: "Turchia",
+        flagUrl: "https://flagcdn.com/w40/tr.png",
+        emojiFlag: "🇹🇷",
+        leagues: [
+          { code: "T1", tier: "1ª Div.", name: "Super Lig", matchesPerRound: 9 }
+        ]
+      },
+      {
+        id: "Grecia",
+        name: "Grecia",
+        flagUrl: "https://flagcdn.com/w40/gr.png",
+        emojiFlag: "🇬🇷",
+        leagues: [
+          { code: "G1", tier: "1ª Div.", name: "Super League", matchesPerRound: 7 }
         ]
       }
     ];
+
+    const FLAG_URL_BY_COUNTRY = {
+      "Italia": "https://flagcdn.com/w40/it.png",
+      "Inghilterra": "https://flagcdn.com/w40/gb-eng.png",
+      "Scozia": "https://flagcdn.com/w40/gb-sct.png",
+      "Spagna": "https://flagcdn.com/w40/es.png",
+      "Germania": "https://flagcdn.com/w40/de.png",
+      "Francia": "https://flagcdn.com/w40/fr.png",
+      "Paesi Bassi": "https://flagcdn.com/w40/nl.png",
+      "Belgio": "https://flagcdn.com/w40/be.png",
+      "Portogallo": "https://flagcdn.com/w40/pt.png",
+      "Turchia": "https://flagcdn.com/w40/tr.png",
+      "Grecia": "https://flagcdn.com/w40/gr.png"
+    };
+
+    let NATIONS = BASE_NATIONS.map(n => ({ ...n, leagues: [...n.leagues] }));
 
     const state = {
       selectedCountry: "Italia",
@@ -229,6 +305,62 @@
       fixturesRows: [],
       roundsByLeague: {}
     };
+
+    function mergeCatalogWithBase(catalogJson) {
+      if (!Array.isArray(catalogJson) || !catalogJson.length) {
+        NATIONS = BASE_NATIONS.map(n => ({ ...n, leagues: [...n.leagues] }));
+        return;
+      }
+
+      const baseByCountry = new Map(BASE_NATIONS.map(n => [n.name.toLowerCase(), n]));
+      const baseLeagueMeta = new Map();
+      for (const n of BASE_NATIONS) {
+        for (const lg of n.leagues) {
+          baseLeagueMeta.set(lg.code.toUpperCase(), lg);
+        }
+      }
+
+      const merged = catalogJson.map((item, idx) => {
+        const countryName = String(item.country || "").trim();
+        const key = countryName.toLowerCase();
+        const existing = baseByCountry.get(key);
+        const leagues = (item.leagues || []).map((lg, lIdx) => {
+          const code = String(lg.code || "").trim().toUpperCase();
+          const prev = baseLeagueMeta.get(code);
+          return {
+            code,
+            tier: prev?.tier || `Lega ${lIdx + 1}`,
+            name: String(lg.name || prev?.name || code).trim(),
+            matchesPerRound: prev?.matchesPerRound || 10
+          };
+        }).filter(l => l.code);
+
+        return {
+          id: existing?.id || countryName || `Country-${idx}`,
+          name: countryName || existing?.name || `Nazione ${idx + 1}`,
+          flagUrl: existing?.flagUrl || FLAG_URL_BY_COUNTRY[countryName] || "",
+          emojiFlag: item.flag || existing?.emojiFlag || "🏳️",
+          leagues: leagues.length ? leagues : (existing?.leagues || [])
+        };
+      }).filter(n => n.leagues.length > 0);
+
+      if (merged.length) {
+        NATIONS = merged;
+        if (!NATIONS.some(n => n.id === state.selectedCountry)) {
+          state.selectedCountry = NATIONS[0].id;
+          state.selectedLeagueCode = NATIONS[0].leagues[0].code;
+        }
+      }
+    }
+
+    async function loadCountriesCatalogFromData() {
+      try {
+        const resp = await fetch(`./data/countries_leagues.json?t=${Date.now()}`, { cache: "no-store" });
+        if (!resp.ok) return;
+        const json = await resp.json();
+        mergeCatalogWithBase(json);
+      } catch (_) {}
+    }
 
     function clampPct(val) {
       const n = Number(val);
@@ -264,6 +396,9 @@
 
     function renderFlagBadge(nationObj, sizeClass = "w-6 h-4") {
       if (!nationObj) return `<span class="text-base">⚽</span>`;
+      if (!nationObj.flagUrl) {
+        return `<span class="text-base leading-none">${nationObj.emojiFlag || "🏳️"}</span>`;
+      }
       return `
         <span class="inline-flex items-center shrink-0">
           <img
@@ -273,13 +408,20 @@
             onerror="this.style.display='none'; this.nextElementSibling.style.display='inline';"
             class="${sizeClass} object-cover rounded-sm border border-white/15"
           />
-          <span class="text-base hidden">${nationObj.emojiFlag}</span>
+          <span class="text-base hidden">${nationObj.emojiFlag || "🏳️"}</span>
         </span>
       `;
     }
 
+    // Parsing DD/MM/AAAA esplicito per evitare inversioni giorno/mese
     function formatExcelDate(val) {
       if (val === null || val === undefined || val === "") return "";
+      if (val instanceof Date && Number.isFinite(val.getTime())) {
+        const dd = String(val.getDate()).padStart(2, "0");
+        const mm = String(val.getMonth() + 1).padStart(2, "0");
+        const yyyy = val.getFullYear();
+        return `${dd}/${mm}/${yyyy}`;
+      }
       if (typeof val === "number" && Number.isFinite(val)) {
         const serialDays = Math.floor(val);
         const utcMs = Date.UTC(1899, 11, 30) + serialDays * 86400000;
@@ -290,8 +432,18 @@
         return `${dd}/${mm}/${yyyy}`;
       }
       const str = String(val).trim();
+      if (!str) return "";
       if (/^\d+(\.\d+)?$/.test(str)) {
         return formatExcelDate(parseFloat(str));
+      }
+      const datePart = str.split(/[\sT]+/)[0];
+      const dmy = datePart.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4})$/);
+      if (dmy) {
+        const dd = String(parseInt(dmy[1], 10)).padStart(2, "0");
+        const mm = String(parseInt(dmy[2], 10)).padStart(2, "0");
+        let yyyy = parseInt(dmy[3], 10);
+        if (yyyy < 100) yyyy += yyyy >= 70 ? 1900 : 2000;
+        return `${dd}/${mm}/${yyyy}`;
       }
       return str;
     }
@@ -353,13 +505,13 @@
       }
       return {
         code,
-        tier: "Lega A",
+        tier: "1ª Div.",
         name: code,
         matchesPerRound: 10,
         nation: NATIONS[0],
-        country: "Italia",
+        country: NATIONS[0].name,
         flagUrl: NATIONS[0].flagUrl,
-        emojiFlag: "🇮🇹"
+        emojiFlag: NATIONS[0].emojiFlag
       };
     }
 
@@ -543,6 +695,8 @@
       const statusEl = document.getElementById("dataStatusText");
       statusEl.textContent = "Caricamento automatico file da ./data/...";
 
+      await loadCountriesCatalogFromData();
+
       const sources = [
         { path: "./data/all_leagues.csv", key: "combogesss_results", target: "resultsRows" },
         { path: "./data/fixtures.xlsx", key: "combogesss_fixtures", target: "fixturesRows" }
@@ -556,9 +710,9 @@
           if (!resp.ok) continue;
 
           const buf = await resp.arrayBuffer();
-          const wb = XLSX.read(buf, { type: "array" });
+          const wb = XLSX.read(buf, { type: "array", cellDates: false });
           const sheet = wb.Sheets[wb.SheetNames[0]];
-          const rows = XLSX.utils.sheet_to_json(sheet, { defval: "" });
+          const rows = XLSX.utils.sheet_to_json(sheet, { defval: "", raw: false });
 
           if (Array.isArray(rows) && rows.length > 0) {
             state[src.target] = rows;
@@ -601,9 +755,9 @@
 
       for (const file of files) {
         const buf = await file.arrayBuffer();
-        const wb = XLSX.read(buf, { type: "array" });
+        const wb = XLSX.read(buf, { type: "array", cellDates: false });
         const sheet = wb.Sheets[wb.SheetNames[0]];
-        const rows = XLSX.utils.sheet_to_json(sheet, { defval: "" });
+        const rows = XLSX.utils.sheet_to_json(sheet, { defval: "", raw: false });
 
         if (file.name.toLowerCase().includes("fix")) {
           state.fixturesRows = rows;
@@ -622,23 +776,26 @@
 
     function renderCountries() {
       const container = document.getElementById("countriesList");
+      const summary = document.getElementById("countriesSummaryLabel");
+      if (summary) summary.textContent = `${NATIONS.length} paesi`;
+
       container.innerHTML = NATIONS.map(nation => {
         const active = nation.id === state.selectedCountry;
         return `
           <button
             type="button"
-            onclick="selectCountry('${nation.id}')"
+            onclick="selectCountry('${nation.id.replace(/'/g, "\\'")}')"
             class="w-full flex items-center justify-between px-3.5 py-3 rounded-xl border text-left transition ${
               active
                 ? "bg-emerald-500/15 border-emerald-400/50 text-white shadow-lg shadow-emerald-950/30"
                 : "glass-card text-slate-200 hover:border-slate-600"
             }"
           >
-            <div class="flex items-center gap-3">
+            <div class="flex items-center gap-3 min-w-0">
               ${renderFlagBadge(nation, "w-7 h-5")}
-              <span class="font-semibold text-sm">${nation.name}</span>
+              <span class="font-semibold text-sm truncate">${nation.name}</span>
             </div>
-            <span class="text-xs ${active ? "text-emerald-300" : "text-slate-500"}">▶</span>
+            <span class="text-xs shrink-0 ${active ? "text-emerald-300" : "text-slate-500"}">▶</span>
           </button>
         `;
       }).join("");
@@ -787,7 +944,8 @@
         leagueName: meta.name,
         countryName: meta.country,
         flagHtml: renderFlagBadge(meta.nation, "w-5 h-3.5"),
-        resultsRows: state.resultsRows
+        resultsRows: state.resultsRows,
+        fixturesRows: state.fixturesRows
       });
     }
 
