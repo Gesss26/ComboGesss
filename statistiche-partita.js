@@ -114,51 +114,63 @@
     `;
   }
 
+  // Parsing rigoroso DD/MM/AAAA (senza mai usare Date.parse su stringhe ambigue)
   function parseDateTimestamp(val) {
-    if (val === null || val === undefined || val === "") return 0;
+    if (val === null || val === undefined || val === "") return null;
+
+    if (val instanceof Date && Number.isFinite(val.getTime())) {
+      return Date.UTC(val.getFullYear(), val.getMonth(), val.getDate());
+    }
+
     if (typeof val === "number" && Number.isFinite(val)) {
       const serialDays = Math.floor(val);
       return Date.UTC(1899, 11, 30) + serialDays * 86400000;
     }
+
     const str = String(val).trim();
+    if (!str) return null;
+
     if (/^\d+(\.\d+)?$/.test(str)) {
       return parseDateTimestamp(parseFloat(str));
     }
 
-    const dmy = str.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})$/);
+    // Estrae la parte data se c'è anche un orario (es. "12/10/2026 15:00")
+    const datePart = str.split(/[\sT]+/)[0];
+
+    // DD/MM/AAAA o DD/MM/AA (giorno sempre per primo, mese sempre per secondo)
+    const dmy = datePart.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4})$/);
     if (dmy) {
       const day = parseInt(dmy[1], 10);
       const month = parseInt(dmy[2], 10) - 1;
       let year = parseInt(dmy[3], 10);
       if (year < 100) year += year >= 70 ? 1900 : 2000;
-      const ts = Date.UTC(year, month, day);
-      return Number.isFinite(ts) ? ts : 0;
+      if (month < 0 || month > 11 || day < 1 || day > 31) return null;
+      const d = new Date(Date.UTC(year, month, day));
+      if (d.getUTCFullYear() !== year || d.getUTCMonth() !== month || d.getUTCDate() !== day) {
+        return null;
+      }
+      return d.getTime();
     }
 
-    const ymd = str.match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})$/);
-    if (ymd) {
-      const year = parseInt(ymd[1], 10);
-      const month = parseInt(ymd[2], 10) - 1;
-      const day = parseInt(ymd[3], 10);
-      const ts = Date.UTC(year, month, day);
-      return Number.isFinite(ts) ? ts : 0;
-    }
+    return null;
+  }
 
-    const parsed = Date.parse(str);
-    return Number.isFinite(parsed) ? parsed : 0;
+  function getEndOfTodayUtc() {
+    const now = new Date();
+    return Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 23, 59, 59, 999);
   }
 
   function formatMatchDate(val) {
     if (val === null || val === undefined || val === "") return "Data N/D";
-    if (typeof val === "number" && Number.isFinite(val)) {
-      const serialDays = Math.floor(val);
-      const utcMs = Date.UTC(1899, 11, 30) + serialDays * 86400000;
-      const d = new Date(utcMs);
-      return `${String(d.getUTCDate()).padStart(2, "0")}/${String(d.getUTCMonth() + 1).padStart(2, "0")}/${d.getUTCFullYear()}`;
+    const ts = parseDateTimestamp(val);
+    if (ts !== null) {
+      const d = new Date(ts);
+      const dd = String(d.getUTCDate()).padStart(2, "0");
+      const mm = String(d.getUTCMonth() + 1).padStart(2, "0");
+      const yyyy = d.getUTCFullYear();
+      return `${dd}/${mm}/${yyyy}`;
     }
-    const str = String(val).trim();
-    if (/^\d+(\.\d+)?$/.test(str)) return formatMatchDate(parseFloat(str));
-    return str;
+    return String(val).trim();
   }
 
   function formatMatchTime(val) {
@@ -197,24 +209,38 @@
     return Number(score.toFixed(1));
   }
 
-  // Restituisce lo storico ordinato dal più vecchio al più recente (cronologico)
+  function isValidCompletedResult(r) {
+    if (r.FTHG === "" || r.FTHG === null || r.FTHG === undefined) return false;
+    if (r.FTAG === "" || r.FTAG === null || r.FTAG === undefined) return false;
+    const hg = Number(r.FTHG);
+    const ag = Number(r.FTAG);
+    return Number.isFinite(hg) && Number.isFinite(ag);
+  }
+
   function collectTeamHistoricalMatches(teamName, leagueCode, resultsRows) {
     const target = String(teamName || "").trim().toLowerCase();
     const divTarget = String(leagueCode || "").trim().toUpperCase();
     const rows = Array.isArray(resultsRows) ? resultsRows : [];
+    const endOfToday = getEndOfTodayUtc();
 
     return rows
       .map((r, rowIndex) => {
         const div = String(r.Div || r.DivCode || "").trim().toUpperCase();
         if (divTarget && div && div !== divTarget) return null;
+
         const rawHome = String(r.HomeTeam || r.Home || "").trim();
         const rawAway = String(r.AwayTeam || r.Away || "").trim();
         const h = rawHome.toLowerCase();
         const a = rawAway.toLowerCase();
+        if (h !== target && a !== target) return null;
+
+        if (!isValidCompletedResult(r)) return null;
+
+        const dateTs = parseDateTimestamp(r.Date);
+        if (dateTs !== null && dateTs > endOfToday) return null;
+
         const hg = Number(r.FTHG);
         const ag = Number(r.FTAG);
-        if ((h !== target && a !== target) || !Number.isFinite(hg) || !Number.isFinite(ag)) return null;
-
         const isHome = h === target;
         const gf = isHome ? hg : ag;
         const ga = isHome ? ag : hg;
@@ -228,7 +254,7 @@
 
         return {
           rowIndex,
-          dateTs: parseDateTimestamp(r.Date),
+          dateTs: dateTs ?? 0,
           isHome,
           opponent: isHome ? rawAway : rawHome,
           homeName: rawHome,
@@ -460,11 +486,15 @@
 
   function computeDixonColeFamilies(match, leagueCode, resultsRows, homeMetrics, awayMetrics) {
     const divTarget = String(leagueCode || "").trim().toUpperCase();
+    const endOfToday = getEndOfTodayUtc();
+
     const leagueRows = (Array.isArray(resultsRows) ? resultsRows : []).filter(r => {
       const div = String(r.Div || r.DivCode || "").trim().toUpperCase();
-      const hg = Number(r.FTHG);
-      const ag = Number(r.FTAG);
-      return (!divTarget || !div || div === divTarget) && Number.isFinite(hg) && Number.isFinite(ag);
+      if (divTarget && div && div !== divTarget) return false;
+      if (!isValidCompletedResult(r)) return false;
+      const dateTs = parseDateTimestamp(r.Date);
+      if (dateTs !== null && dateTs > endOfToday) return false;
+      return true;
     });
 
     let leagueAvgHome = 1.48;
@@ -549,6 +579,7 @@
 
   function computeLeagueStandings(match, leagueCode, resultsRows, fixturesRows) {
     const divTarget = String(leagueCode || "").trim().toUpperCase();
+    const endOfToday = getEndOfTodayUtc();
     const table = new Map();
 
     const ensureTeam = (rawName) => {
@@ -580,12 +611,16 @@
     for (const r of rows) {
       const div = String(r.Div || r.DivCode || "").trim().toUpperCase();
       if (divTarget && div && div !== divTarget) continue;
+      if (!isValidCompletedResult(r)) continue;
+
+      const dateTs = parseDateTimestamp(r.Date);
+      if (dateTs !== null && dateTs > endOfToday) continue;
 
       const homeTeam = ensureTeam(r.HomeTeam || r.Home);
       const awayTeam = ensureTeam(r.AwayTeam || r.Away);
       const hg = Number(r.FTHG);
       const ag = Number(r.FTAG);
-      if (!homeTeam || !awayTeam || !Number.isFinite(hg) || !Number.isFinite(ag)) continue;
+      if (!homeTeam || !awayTeam) continue;
 
       homeTeam.played += 1;
       awayTeam.played += 1;
@@ -809,7 +844,6 @@
       `;
     }
 
-    // Dalla più recente alla meno recente
     const newestFirst = [...histList].reverse();
 
     const itemsHtml = newestFirst.map(g => {
@@ -925,7 +959,6 @@
     const dateTimeLabel = [dateStr, timeStr].filter(Boolean).join(" • ");
     const giornataLabel = roundLabel || (roundNumber ? `Giornata ${roundNumber}` : "Giornata");
 
-    // Storico ordinato dal più vecchio al più recente: le ultime 5 coincidono esattamente con forma e storico
     const homeHist = collectTeamHistoricalMatches(match.home, leagueCode, resultsRows);
     const awayHist = collectTeamHistoricalMatches(match.away, leagueCode, resultsRows);
 
