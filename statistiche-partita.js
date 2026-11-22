@@ -64,6 +64,43 @@
         background: rgba(239, 68, 68, 0.16);
         border-color: rgba(239, 68, 68, 0.55);
       }
+
+      /* ===== Tema futuristico (overlay statistiche) ===== */
+      #combogesssMatchStatsOverlay {
+        font-family: "Exo 2", Inter, system-ui, sans-serif;
+        background-color: #020817 !important;
+        background-image:
+          linear-gradient(rgba(103, 232, 249, 0.05) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(103, 232, 249, 0.05) 1px, transparent 1px),
+          radial-gradient(1000px 620px at 8% -8%, rgba(34, 211, 238, 0.24), transparent 60%),
+          radial-gradient(900px 640px at 96% 8%, rgba(59, 130, 246, 0.26), transparent 60%),
+          radial-gradient(900px 700px at 55% 112%, rgba(14, 165, 233, 0.20), transparent 62%),
+          linear-gradient(160deg, #020617 0%, #061634 45%, #031b30 100%) !important;
+        background-size: 48px 48px, 48px 48px, auto, auto, auto, auto !important;
+        background-attachment: fixed !important;
+      }
+      #combogesssMatchStatsOverlay h3 {
+        font-family: Orbitron, "Exo 2", sans-serif;
+        letter-spacing: 0.05em;
+        text-shadow: 0 0 10px rgba(34, 211, 238, 0.45);
+      }
+      #combogesssMatchStatsOverlay [class*="rounded-2xl"][class*="border"],
+      #combogesssMatchStatsOverlay [class*="rounded-xl"][class*="border"] {
+        -webkit-backdrop-filter: blur(8px);
+        backdrop-filter: blur(8px);
+        box-shadow: inset 0 1px 0 rgba(165, 243, 252, 0.07), 0 0 20px rgba(14, 165, 233, 0.07);
+      }
+      #combogesssMatchStatsOverlay [class^="bg-slate-950"], #combogesssMatchStatsOverlay [class*=" bg-slate-950"] { background-color: rgba(2, 12, 30, 0.78) !important; }
+      #combogesssMatchStatsOverlay [class^="bg-slate-900"], #combogesssMatchStatsOverlay [class*=" bg-slate-900"] { background-color: rgba(7, 26, 54, 0.72) !important; }
+      #combogesssMatchStatsOverlay [class^="bg-slate-800"], #combogesssMatchStatsOverlay [class*=" bg-slate-800"] { background-color: rgba(10, 38, 74, 0.80) !important; }
+      #combogesssMatchStatsOverlay [class*=" border-slate-"], #combogesssMatchStatsOverlay [class^="border-slate-"] { border-color: rgba(56, 189, 248, 0.24) !important; }
+      #combogesssMatchStatsOverlay .bg-cyan-600 {
+        background-image: linear-gradient(135deg, #0891b2, #2563eb) !important;
+        box-shadow: 0 0 18px rgba(34, 211, 238, 0.35);
+      }
+      #combogesssMatchStatsOverlay .text-slate-300 { color: #b4d6f2 !important; }
+      #combogesssMatchStatsOverlay .text-slate-400 { color: #86b3d8 !important; }
+      #combogesssMatchStatsOverlay .text-slate-500 { color: #5f8db3 !important; }
     `;
     document.head.appendChild(style);
   }
@@ -724,15 +761,15 @@
               ${badgeRole ? `<span class="text-[9px] px-1.5 py-0.5 rounded bg-amber-400/20 text-amber-300 border border-amber-400/50 font-extrabold shrink-0">${badgeRole}</span>` : ""}
             </div>
           </td>
-          <td class="py-2 px-1 text-center text-[11px] ${isHighlighted ? "text-emerald-300" : "text-slate-300"}">${row.won}</td>
+          <td class="py-2 px-1 text-center text-[11px] ${isHighlighted ? "text-cyan-300" : "text-slate-300"}">${row.won}</td>
           <td class="py-2 px-1 text-center text-[11px] ${isHighlighted ? "text-yellow-300" : "text-slate-300"}">${row.drawn}</td>
           <td class="py-2 px-1 text-center text-[11px] ${isHighlighted ? "text-rose-300" : "text-slate-300"}">${row.lost}</td>
-          <td class="py-2 px-1 text-center text-[11px] ${isHighlighted ? "text-emerald-300" : "text-slate-300"}">${row.gf}</td>
+          <td class="py-2 px-1 text-center text-[11px] ${isHighlighted ? "text-cyan-300" : "text-slate-300"}">${row.gf}</td>
           <td class="py-2 px-1 text-center text-[11px] ${isHighlighted ? "text-rose-300" : "text-slate-300"}">${row.ga}</td>
           <td class="py-2 px-1 text-center text-[11px] ${isHighlighted ? "text-amber-200" : "text-slate-300"}">${row.gd > 0 ? `+${row.gd}` : row.gd}</td>
           <td class="py-2 px-1 text-center text-[11px] ${isHighlighted ? "text-amber-200" : "text-slate-300"}">${row.avgGoals.toFixed(2)}</td>
           <td class="py-2 px-1 text-center text-[11px] ${isHighlighted ? "text-amber-300" : "text-sky-300"}">${row.xg.toFixed(2)}</td>
-          <td class="py-2 pl-1 pr-2 text-right text-xs font-extrabold ${isHighlighted ? "text-amber-300" : "text-emerald-400"}">${row.points}</td>
+          <td class="py-2 pl-1 pr-2 text-right text-xs font-extrabold ${isHighlighted ? "text-amber-300" : "text-cyan-400"}">${row.points}</td>
         </tr>
       `;
     }).join("");
@@ -776,7 +813,7 @@
   function renderStatChip(item) {
     const isBomb = clampPct(item.pct) >= 90;
     return `
-      <div class="rounded-xl bg-slate-950/80 border border-slate-800/90 hover:border-emerald-500/40 px-3 py-2.5 flex items-center justify-between gap-2 transition ${isBomb ? "flag-bomb" : ""}">
+      <div class="rounded-xl bg-slate-950/80 border border-slate-800/90 hover:border-cyan-500/40 px-3 py-2.5 flex items-center justify-between gap-2 transition ${isBomb ? "flag-bomb" : ""}">
         <span class="text-xs font-bold text-slate-200 leading-tight">${item.label}</span>
         <div class="text-right shrink-0">
           <div>${renderPctBadge(item.pct, "text-xs sm:text-sm")}</div>
@@ -823,7 +860,7 @@
     return `
       <section class="rounded-2xl bg-slate-900/85 border border-slate-800 p-4 sm:p-5 space-y-3">
         <div class="flex items-center justify-between border-b border-slate-800 pb-2.5">
-          <h3 class="text-sm sm:text-base font-extrabold text-emerald-300 tracking-wide">${fam.title}</h3>
+          <h3 class="text-sm sm:text-base font-extrabold text-cyan-300 tracking-wide">${fam.title}</h3>
           <span class="text-[11px] text-slate-400">${totalCount} mercati</span>
         </div>
         ${bodyHtml}
@@ -968,7 +1005,7 @@
       <button
         id="backToMatchesBtn"
         type="button"
-        class="fixed top-4 left-4 z-[60] flex items-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs sm:text-sm font-extrabold shadow-xl shadow-emerald-950/60 border border-emerald-300/30 transition cursor-pointer"
+        class="fixed top-4 left-4 z-[60] flex items-center gap-2 px-4 py-2.5 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white text-xs sm:text-sm font-extrabold shadow-xl shadow-cyan-950/60 border border-cyan-300/30 transition cursor-pointer"
       >
         <span>←</span>
         <span>Torna alle partite</span>
@@ -1003,7 +1040,7 @@
     tabs.forEach(btn => {
       const active = btn.getAttribute("data-cg-tab-btn") === tabId;
       btn.className = active
-        ? "px-3.5 py-2 rounded-xl text-xs sm:text-sm font-extrabold bg-emerald-500/20 text-emerald-300 border border-emerald-400/60 transition cursor-pointer"
+        ? "px-3.5 py-2 rounded-xl text-xs sm:text-sm font-extrabold bg-cyan-500/20 text-cyan-300 border border-cyan-400/60 transition cursor-pointer"
         : "px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold bg-slate-900/90 text-slate-300 border border-slate-800 hover:border-slate-600 transition cursor-pointer";
     });
   };
@@ -1049,7 +1086,7 @@
         <!-- Colonna Sinistra: Partita + 4 Tab -->
         <div class="lg:col-span-7 space-y-5">
           <!-- Header Partita -->
-          <div class="rounded-2xl bg-gradient-to-br from-slate-900 via-slate-900 to-emerald-950/30 border border-slate-700/70 p-5 sm:p-6 shadow-2xl">
+          <div class="rounded-2xl bg-gradient-to-br from-slate-900 via-slate-900 to-cyan-950/30 border border-slate-700/70 p-5 sm:p-6 shadow-2xl">
             <div class="flex flex-wrap items-center justify-between gap-2 text-xs text-slate-300 mb-4">
               <div class="flex items-center gap-2 font-semibold">
                 ${flagHtml || ""}
@@ -1057,7 +1094,7 @@
                 ${countryName ? `<span class="text-slate-500">•</span><span>${countryName}</span>` : ""}
               </div>
               <div class="flex flex-wrap items-center gap-2">
-                <span class="px-2.5 py-1 rounded-lg bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 font-bold">
+                <span class="px-2.5 py-1 rounded-lg bg-cyan-500/15 text-cyan-300 border border-cyan-500/30 font-bold">
                   ${giornataLabel}
                 </span>
                 <span class="px-2.5 py-1 rounded-lg bg-slate-800 text-slate-200 border border-slate-700 font-semibold">
@@ -1077,7 +1114,7 @@
                 <div class="text-sm">${renderPctBadge(homeFormVal, "px-2.5 py-0.5 rounded-lg")}</div>
                 <div class="pt-1 border-t border-slate-800/80 text-xs text-slate-300 space-y-1">
                   <div>
-                    Media Gol: <strong class="text-emerald-300">${hm.avgScored.toFixed(2)}</strong>
+                    Media Gol: <strong class="text-cyan-300">${hm.avgScored.toFixed(2)}</strong>
                     <span class="text-slate-500">/</span>
                     <strong class="text-rose-300">${hm.avgConceded.toFixed(2)}</strong>
                     <span class="text-[10px] text-slate-400">(F/S)</span>
@@ -1092,7 +1129,7 @@
               <div class="space-y-2">
                 <div class="text-xs uppercase tracking-widest text-slate-400 font-bold">Partita</div>
                 <div class="text-2xl font-black text-white">VS</div>
-                ${match.ftResult ? `<div class="inline-block px-3 py-1 rounded-full text-xs font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">Finale: ${match.ftResult}</div>` : ""}
+                ${match.ftResult ? `<div class="inline-block px-3 py-1 rounded-full text-xs font-bold bg-cyan-500/20 text-cyan-300 border border-cyan-500/40">Finale: ${match.ftResult}</div>` : ""}
                 <div class="pt-1">
                   <div class="text-[11px] text-slate-400">Differenza Forma (Positiva)</div>
                   <div class="text-base mt-0.5">${renderPctBadge(diffFormVal, "px-2.5 py-0.5 rounded-lg")}</div>
@@ -1129,7 +1166,7 @@
 
           <!-- Barra 4 Tab -->
           <div class="flex flex-wrap items-center gap-2">
-            <button type="button" data-cg-tab-btn="reali" onclick="switchMatchStatsTab('reali')" class="px-3.5 py-2 rounded-xl text-xs sm:text-sm font-extrabold bg-emerald-500/20 text-emerald-300 border border-emerald-400/60 transition cursor-pointer">
+            <button type="button" data-cg-tab-btn="reali" onclick="switchMatchStatsTab('reali')" class="px-3.5 py-2 rounded-xl text-xs sm:text-sm font-extrabold bg-cyan-500/20 text-cyan-300 border border-cyan-400/60 transition cursor-pointer">
               📊 Statistiche Reali
             </button>
             <button type="button" data-cg-tab-btn="dixon" onclick="switchMatchStatsTab('dixon')" class="px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold bg-slate-900/90 text-slate-300 border border-slate-800 hover:border-slate-600 transition cursor-pointer">
@@ -1160,7 +1197,7 @@
           <!-- Tab 3: Storico Partite diviso in 2 colonne -->
           <div data-cg-tab-panel="storico" class="hidden">
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-              ${renderHistoryColumn(match.home, homeHist, "text-emerald-300")}
+              ${renderHistoryColumn(match.home, homeHist, "text-cyan-300")}
               ${renderHistoryColumn(match.away, awayHist, "text-sky-300")}
             </div>
           </div>
@@ -1168,7 +1205,7 @@
           <!-- Tab 4: Frequenza Gol (schermo diviso in 2: casa a sinistra, trasferta a destra) -->
           <div data-cg-tab-panel="frequenza" class="hidden">
             <div class="grid grid-cols-2 gap-2 sm:gap-4">
-              ${renderGoalFreqColumn(match.home, homeHist, "text-emerald-300", "bg-emerald-400", "Squadra di casa")}
+              ${renderGoalFreqColumn(match.home, homeHist, "text-cyan-300", "bg-cyan-400", "Squadra di casa")}
               ${renderGoalFreqColumn(match.away, awayHist, "text-sky-300", "bg-sky-400", "Squadra in trasferta")}
             </div>
           </div>
