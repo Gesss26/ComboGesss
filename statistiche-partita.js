@@ -622,7 +622,7 @@
   };
   const topPicksCache = new WeakMap();
 
-  // Per ogni famiglia (DC, Over/Under, Multigol Totali) restituisce la giocata con % più alta
+  // Per ogni famiglia (DC, Over/Under, Multigol Totali) la giocata con % più alta, più la fissa 12+Under 4,5
   function pickBestFromFamilies(families) {
     const out = [];
     for (const title of Object.keys(TOP_PICK_FAMILIES)) {
@@ -636,6 +636,13 @@
         }
       }
       if (best) out.push(best);
+    }
+
+    // 4ª giocata fissa: 12 + Under 4,5 (dalla famiglia Combo DC+Under)
+    const comboFam = (families || []).find(f => f.title === "Combo DC+Under");
+    const combo = comboFam && (comboFam.items || []).find(it => String(it.label).replace(/\s+/g, "") === "12+Under4,5");
+    if (combo) {
+      out.push({ label: "12+Under 4,5", pct: combo.pct, family: "CMB" });
     }
     return out;
   }
