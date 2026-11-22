@@ -614,6 +614,62 @@
     };
   }
 
+  // ---- Giocata con la % più alta tra le famiglie DC, Over/Under, Multigol Totali ----
+  const TOP_PICK_FAMILIES = {
+    "DC": "DC",
+    "Over/Under": "O/U",
+    "Multigol Totali": "MG"
+  };
+  const topPicksCache = new WeakMap();
+
+  function pickBestFromFamilies(families) {
+    let best = null;
+    for (const fam of families || []) {
+      const tag = TOP_PICK_FAMILIES[fam.title];
+      if (!tag) continue;
+      const items = fam.items ? fam.items : [...(fam.overItems || []), ...(fam.underItems || [])];
+      for (const it of items) {
+        if (!best || it.pct > best.pct) {
+          best = { label: it.label, pct: it.pct, family: tag };
+        }
+      }
+    }
+    return best;
+  }
+
+  // Usata dalla home: restituisce { real, dixon } per una partita
+  window.computeMatchTopPicks = function (match, leagueCode, resultsRows) {
+    if (!match) return { real: null, dixon: null };
+
+    const canCache = Array.isArray(resultsRows);
+    let cache = null;
+    if (canCache) {
+      cache = topPicksCache.get(resultsRows);
+      if (!cache) {
+        cache = new Map();
+        topPicksCache.set(resultsRows, cache);
+      }
+      const hit = cache.get(`${leagueCode}|${match.id}`);
+      if (hit) return hit;
+    }
+
+    const homeHist = collectTeamHistoricalMatches(match.home, leagueCode, resultsRows);
+    const awayHist = collectTeamHistoricalMatches(match.away, leagueCode, resultsRows);
+    const hm = computeTeamMetrics(homeHist, 1.45, 1.05);
+    const am = computeTeamMetrics(awayHist, 1.25, 1.25);
+
+    const realFamilies = computeRealFamilies(match, homeHist, awayHist);
+    const dcData = computeDixonColeFamilies(match, leagueCode, resultsRows, hm, am);
+
+    const result = {
+      real: pickBestFromFamilies(realFamilies),
+      dixon: pickBestFromFamilies(dcData.families)
+    };
+
+    if (cache) cache.set(`${leagueCode}|${match.id}`, result);
+    return result;
+  };
+
   function computeLeagueStandings(match, leagueCode, resultsRows, fixturesRows) {
     const divTarget = String(leagueCode || "").trim().toUpperCase();
     const endOfToday = getEndOfTodayUtc();
