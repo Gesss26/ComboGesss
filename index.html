@@ -1,0 +1,1601 @@
+<!DOCTYPE html>
+<html lang="it" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ComboGesss — Analisi Statistica & Pronostici Calcio Europeo</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- SheetJS (XLSX) per lettura file Excel/CSV di football-data.co.uk -->
+  <script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"></script>
+  <!-- Google Fonts: Inter & JetBrains Mono -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet" />
+
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'sans-serif'],
+            mono: ['JetBrains Mono', 'monospace'],
+          },
+          colors: {
+            slate: {
+              850: '#151e2e',
+              900: '#0f172a',
+              950: '#090d16',
+            }
+          }
+        }
+      }
+    };
+  </script>
+
+  <style>
+    body {
+      font-family: 'Inter', sans-serif;
+      background-color: #090d16;
+      color: #f1f5f9;
+    }
+    /* Custom scrollbar elegante */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #0f172a;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #334155;
+      border-radius: 9999px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #10b981;
+    }
+    .glass-panel {
+      background: rgba(15, 23, 42, 0.85);
+      backdrop-filter: blur(12px);
+      border: 1px solid rgba(51, 65, 85, 0.6);
+    }
+    .odd-btn {
+      transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .odd-btn:active {
+      transform: scale(0.96);
+    }
+    @keyframes fadeSlideIn {
+      from {
+        opacity: 0;
+        transform: translateY(6px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+    .animate-in {
+      animation: fadeSlideIn 0.22s ease-out forwards;
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col antialiased selection:bg-emerald-500/30 selection:text-emerald-300">
+
+  <!-- TOP NAVBAR -->
+  <header class="sticky top-0 z-40 glass-panel border-b border-slate-800/80 px-4 sm:px-6 py-3">
+    <div class="max-w-[1440px] mx-auto flex flex-wrap items-center justify-between gap-3">
+      <!-- Brand Logo -->
+      <div class="flex items-center gap-3 cursor-pointer" onclick="resetToHome()">
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500 to-cyan-500 flex items-center justify-center shadow-lg shadow-emerald-500/20">
+          <svg class="w-6 h-6 text-slate-950" fill="none" stroke="currentColor" stroke-width="2.4" viewBox="0 0 24 24">
+            <circle cx="12" cy="12" r="9" />
+            <path d="M12 7l3.5 2.5-1.3 4.2H9.8L8.5 9.5 12 7z" />
+            <path d="M12 3v4M20.5 9.5l-5 0M18 18.5l-3.8-4.8M6 18.5l3.8-4.8M3.5 9.5l5 0" />
+          </svg>
+        </div>
+        <div>
+          <div class="flex items-center gap-2">
+            <span class="text-xl font-extrabold tracking-tight bg-gradient-to-r from-white via-slate-100 to-emerald-400 bg-clip-text text-transparent">ComboGesss</span>
+            <span class="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">Pro Analytics</span>
+          </div>
+          <p class="text-xs text-slate-400 hidden sm:block">Top 5 Campionati Europei & Serie Minori • Dati football-data.co.uk</p>
+        </div>
+      </div>
+
+      <!-- Data Source Status & Import Actions -->
+      <div class="flex items-center gap-2 sm:gap-3">
+        <!-- Indicatore Sorgente Dati -->
+        <div id="dataSourceBadge" class="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-800/90 border border-slate-700/80 text-xs">
+          <span id="dataSourceDot" class="w-2 h-2 rounded-full bg-amber-400 animate-pulse"></span>
+          <span id="dataSourceLabel" class="font-medium text-slate-300">Dataset Demo (Stagione Attuale)</span>
+        </div>
+
+        <!-- Bottone Importa Excel football-data.co.uk -->
+        <button onclick="openImportModal()" class="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-semibold text-xs sm:text-sm transition shadow-lg shadow-emerald-500/20 cursor-pointer">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+          </svg>
+          <span>Importa Excel</span>
+        </button>
+
+        <!-- Bottone Schedina Mobile/Tablet -->
+        <button onclick="toggleComboDrawer()" class="lg:hidden relative flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-100 text-xs font-semibold">
+          <svg class="w-4 h-4 text-cyan-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+          </svg>
+          <span>Combo</span>
+          <span id="mobileComboCount" class="px-1.5 py-0.2 rounded-full bg-cyan-500 text-slate-950 font-bold text-[11px]">0</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- MAIN WORKSPACE -->
+  <main class="flex-1 max-w-[1440px] w-full mx-auto px-4 sm:px-6 py-5 grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
+
+    <!-- COLONNA SINISTRA: SELETTORE NAZIONI (In Colonna come richiesto) -->
+    <aside class="lg:col-span-3 flex flex-col gap-4">
+      <div class="glass-panel rounded-2xl p-4 shadow-xl">
+        <div class="flex items-center justify-between mb-3">
+          <h2 class="text-xs font-bold uppercase tracking-wider text-slate-400">1. Scegli Nazione</h2>
+          <span class="text-[11px] text-slate-500 font-mono">TOP 5 EU</span>
+        </div>
+
+        <!-- Lista Verticale delle 5 Nazioni -->
+        <div id="countriesList" class="flex flex-col gap-2">
+          <!-- Popolato dinamicamente via JS -->
+        </div>
+      </div>
+
+      <!-- Mini Riepilogo Database Caricato -->
+      <div class="glass-panel rounded-2xl p-4 text-xs text-slate-400 space-y-2.5">
+        <div class="flex items-center justify-between text-slate-200 font-semibold">
+          <span>Stato Archivio Dati</span>
+          <button onclick="resetToDemoData()" id="resetDemoBtn" class="hidden text-[11px] text-amber-400 hover:underline cursor-pointer">Ripristina Demo</button>
+        </div>
+        <div class="grid grid-cols-2 gap-2 pt-1">
+          <div class="bg-slate-900/90 border border-slate-800 rounded-xl p-2.5">
+            <div class="text-slate-500 text-[11px]">Partite Storiche</div>
+            <div id="statTotalHistory" class="text-base font-bold font-mono text-emerald-400 mt-0.5">0</div>
+          </div>
+          <div class="bg-slate-900/90 border border-slate-800 rounded-xl p-2.5">
+            <div class="text-slate-500 text-[11px]">Prossimi Match</div>
+            <div id="statTotalFixtures" class="text-base font-bold font-mono text-cyan-400 mt-0.5">0</div>
+          </div>
+        </div>
+        <p class="text-[11px] leading-relaxed text-slate-500">
+          Scarica i file <span class="text-slate-300 font-mono">.xlsx</span> da <span class="text-emerald-400">football-data.co.uk</span> per aggiornare statistiche e quote reali.
+        </p>
+      </div>
+    </aside>
+
+    <!-- COLONNA CENTRALE: SCELTA LEGA A / LEGA B + GIORNATA DI PARTITE -->
+    <section class="lg:col-span-6 flex flex-col gap-4">
+
+      <!-- STEP 2: Scelta tra Lega A e Lega B della nazione selezionata -->
+      <div id="leagueSelectorPanel" class="glass-panel rounded-2xl p-4 sm:p-5 shadow-xl animate-in">
+        <div class="flex items-center justify-between mb-3">
+          <div class="flex items-center gap-2">
+            <span id="selectedCountryFlag" class="text-2xl">🇮🇹</span>
+            <div>
+              <h2 class="text-sm sm:text-base font-bold text-white flex items-center gap-2">
+                <span id="selectedCountryName">Italia</span>
+                <span class="text-xs font-normal text-slate-400">— Seleziona Divisione</span>
+              </h2>
+            </div>
+          </div>
+          <span class="text-[11px] font-semibold uppercase tracking-wider text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-1 rounded-lg">2. Lega A / Lega B</span>
+        </div>
+
+        <!-- Due Card Affiancate: Lega A vs Lega B -->
+        <div id="divisionsGrid" class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <!-- Popolato dinamicamente via JS -->
+        </div>
+      </div>
+
+      <!-- STEP 3: Visualizzazione dell'intera giornata di partite -->
+      <div id="matchdaySection" class="glass-panel rounded-2xl p-4 sm:p-5 shadow-xl animate-in">
+        <!-- Header Campionato & Navigatore Giornata -->
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-800">
+          <div>
+            <div class="flex items-center gap-2">
+              <span id="activeLeagueBadge" class="px-2 py-0.5 rounded-md text-[11px] font-mono font-bold bg-cyan-500/15 text-cyan-400 border border-cyan-500/30">I1</span>
+              <h3 id="activeLeagueTitle" class="text-lg font-extrabold text-white">Serie A</h3>
+              <span id="activeLeagueTeamsCount" class="text-xs text-slate-400">(20 squadre • 10 partite/giornata)</span>
+            </div>
+            <p id="activeRoundSubtitle" class="text-xs text-slate-400 mt-0.5">Prossima Giornata in Programma • Clicca su una quota per aggiungerla alla Combo</p>
+          </div>
+
+          <!-- Selettore Giornate (Passate / Prossima) -->
+          <div class="flex items-center gap-1.5 bg-slate-900 border border-slate-800 p-1 rounded-xl self-start sm:self-auto">
+            <button onclick="changeMatchday(-1)" id="prevRoundBtn" class="p-1.5 rounded-lg hover:bg-slate-800 text-slate-300 disabled:opacity-30 transition cursor-pointer" title="Giornata precedente">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7" /></svg>
+            </button>
+            <select id="roundSelect" onchange="selectRound(this.value)" class="bg-transparent text-xs font-bold text-slate-100 px-2 py-1 focus:outline-none cursor-pointer">
+              <!-- Popolato via JS -->
+            </select>
+            <button onclick="changeMatchday(1)" id="nextRoundBtn" class="p-1.5 rounded-lg hover:bg-slate-800 text-slate-300 disabled:opacity-30 transition cursor-pointer" title="Giornata successiva">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" /></svg>
+            </button>
+          </div>
+        </div>
+
+        <!-- Barra Filtri Rapidi & Riepilogo Giornata -->
+        <div class="flex flex-wrap items-center justify-between gap-2 py-3 border-b border-slate-800/70 text-xs">
+          <div class="flex items-center gap-1.5 flex-wrap">
+            <button onclick="setQuickFilter('ALL')" data-filter="ALL" class="filter-chip px-2.5 py-1 rounded-lg font-semibold bg-emerald-500 text-slate-950 cursor-pointer">Tutte (<span id="countAll">10</span>)</button>
+            <button onclick="setQuickFilter('OVER25')" data-filter="OVER25" class="filter-chip px-2.5 py-1 rounded-lg font-medium bg-slate-800/90 text-slate-300 hover:bg-slate-700 cursor-pointer">🔥 Top Over 2.5</button>
+            <button onclick="setQuickFilter('BTTS')" data-filter="BTTS" class="filter-chip px-2.5 py-1 rounded-lg font-medium bg-slate-800/90 text-slate-300 hover:bg-slate-700 cursor-pointer">⚽ Top Gol (BTTS)</button>
+            <button onclick="setQuickFilter('HOME_STRONG')" data-filter="HOME_STRONG" class="filter-chip px-2.5 py-1 rounded-lg font-medium bg-slate-800/90 text-slate-300 hover:bg-slate-700 cursor-pointer">🏠 Fattore Casa</button>
+          </div>
+          <div class="text-[11px] text-slate-400">
+            Media Gol Lega: <span id="leagueAvgGoals" class="font-mono font-bold text-emerald-400">2.68</span>
+          </div>
+        </div>
+
+        <!-- Lista Partite della Giornata -->
+        <div id="matchesContainer" class="mt-3 flex flex-col gap-3">
+          <!-- Popolato dinamicamente via JS -->
+        </div>
+      </div>
+
+    </section>
+
+    <!-- COLONNA DESTRA: COMBO BUILDER (SCHEDINA PRONOSTICI) -->
+    <aside id="comboSidebar" class="hidden lg:flex lg:col-span-3 flex-col gap-4 sticky top-20">
+      <div class="glass-panel rounded-2xl p-4 shadow-xl border border-slate-800">
+        <div class="flex items-center justify-between pb-3 border-b border-slate-800">
+          <div class="flex items-center gap-2">
+            <span class="w-2.5 h-2.5 rounded-full bg-cyan-400"></span>
+            <h3 class="text-sm font-extrabold text-white tracking-tight">ComboGesss Builder</h3>
+          </div>
+          <button onclick="clearCombo()" id="clearComboBtn" class="text-xs text-slate-400 hover:text-rose-400 transition cursor-pointer">Svuota</button>
+        </div>
+
+        <!-- Elenco Selezioni -->
+        <div id="comboList" class="py-3 max-h-[380px] overflow-y-auto flex flex-col gap-2">
+          <!-- Popolato via JS -->
+        </div>
+
+        <!-- Calcolo Quota Totale & Probabilità Stimata -->
+        <div class="pt-3 border-t border-slate-800 space-y-3">
+          <div class="bg-slate-900/90 rounded-xl p-3 border border-slate-800/90 space-y-2">
+            <div class="flex items-center justify-between text-xs">
+              <span class="text-slate-400">Eventi selezionati</span>
+              <span id="comboEventsCount" class="font-mono font-bold text-white">0</span>
+            </div>
+            <div class="flex items-center justify-between text-xs">
+              <span class="text-slate-400">Probabilità Statistica</span>
+              <span id="comboStatProb" class="font-mono font-bold text-emerald-400">0.0%</span>
+            </div>
+            <div class="flex items-center justify-between text-sm pt-1 border-t border-slate-800">
+              <span class="font-semibold text-slate-200">Quota Totale</span>
+              <span id="comboTotalOdd" class="font-mono text-lg font-extrabold text-cyan-400">1.00</span>
+            </div>
+          </div>
+
+          <div class="flex items-center gap-2">
+            <div class="flex-1 bg-slate-900 border border-slate-800 rounded-xl px-3 py-1.5 flex items-center justify-between">
+              <span class="text-[11px] text-slate-400">Puntata €</span>
+              <input id="stakeInput" type="number" min="1" max="10000" value="10" oninput="renderCombo()" class="w-16 bg-transparent text-right font-mono font-bold text-sm text-white focus:outline-none" />
+            </div>
+            <div class="flex-1 bg-emerald-500/10 border border-emerald-500/30 rounded-xl px-3 py-1.5 text-right">
+              <div class="text-[10px] text-emerald-400 uppercase font-semibold">Vincita Pot.</div>
+              <div id="potentialWin" class="font-mono font-extrabold text-sm text-emerald-300">€ 0.00</div>
+            </div>
+          </div>
+
+          <button onclick="copyComboToClipboard()" class="w-full py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-cyan-500 hover:from-emerald-400 hover:to-cyan-400 text-slate-950 font-bold text-xs tracking-wide transition shadow-lg shadow-emerald-500/15 cursor-pointer">
+            Copia Pronostico Combo
+          </button>
+        </div>
+      </div>
+    </aside>
+
+  </main>
+
+  <!-- DRAWER MOBILE PER COMBO BUILDER -->
+  <div id="mobileComboDrawer" class="fixed inset-0 z-50 hidden lg:hidden bg-slate-950/80 backdrop-blur-sm">
+    <div class="absolute right-0 top-0 bottom-0 w-full max-w-sm bg-slate-900 border-l border-slate-800 p-4 flex flex-col justify-between">
+      <div>
+        <div class="flex items-center justify-between pb-3 border-b border-slate-800">
+          <h3 class="text-base font-extrabold text-white">ComboGesss Builder</h3>
+          <button onclick="toggleComboDrawer()" class="p-1.5 rounded-lg bg-slate-800 text-slate-300">✕</button>
+        </div>
+        <div id="mobileComboList" class="py-3 max-h-[60vh] overflow-y-auto flex flex-col gap-2"></div>
+      </div>
+      <div class="pt-3 border-t border-slate-800 space-y-3">
+        <div class="flex justify-between text-sm">
+          <span class="text-slate-400">Quota Totale:</span>
+          <span id="mobileComboTotalOdd" class="font-mono font-extrabold text-cyan-400 text-lg">1.00</span>
+        </div>
+        <div class="flex gap-2">
+          <button onclick="clearCombo()" class="px-4 py-2.5 rounded-xl bg-slate-800 text-slate-300 text-xs font-semibold">Svuota</button>
+          <button onclick="copyComboToClipboard()" class="flex-1 py-2.5 rounded-xl bg-emerald-500 text-slate-950 font-bold text-xs">Copia Combo</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODALE DETTAGLIO STATISTICO PARTITA -->
+  <div id="matchDetailModal" class="fixed inset-0 z-50 hidden items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
+    <div class="bg-slate-900 border border-slate-700/90 rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl animate-in">
+      <div id="matchDetailContent" class="p-5 sm:p-6">
+        <!-- Popolato dinamicamente via JS -->
+      </div>
+    </div>
+  </div>
+
+  <!-- MODALE IMPORTAZIONE FILE EXCEL DA FOOTBALL-DATA.CO.UK -->
+  <div id="importModal" class="fixed inset-0 z-50 hidden items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
+    <div class="bg-slate-900 border border-slate-700/90 rounded-2xl max-w-2xl w-full max-h-[92vh] overflow-y-auto shadow-2xl p-5 sm:p-6 animate-in">
+      <div class="flex items-start justify-between gap-4 pb-4 border-b border-slate-800">
+        <div>
+          <span class="text-[11px] font-bold uppercase tracking-wider text-emerald-400">Integrazione Dati Ufficiali</span>
+          <h3 class="text-xl font-extrabold text-white mt-0.5">Importa Excel da football-data.co.uk</h3>
+        </div>
+        <button onclick="closeImportModal()" class="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 cursor-pointer">✕</button>
+      </div>
+
+      <div class="mt-4 space-y-4 text-sm text-slate-300">
+        <!-- Step 1 & 2: Link diretti a football-data.co.uk -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div class="bg-slate-950/80 border border-slate-800 rounded-xl p-3.5 flex flex-col justify-between">
+            <div>
+              <div class="flex items-center gap-2 text-emerald-400 font-bold text-xs uppercase mb-1">
+                <span>1. Risultati Storici (Statistiche)</span>
+              </div>
+              <p class="text-xs text-slate-400 leading-relaxed">
+                Scarica il file Excel della stagione corrente (es. <code class="text-slate-200">all-euro-data-2025-2026.xlsx</code> o singolo campionato <code class="text-slate-200">I1.csv</code>).
+              </p>
+            </div>
+            <a href="https://football-data.co.uk/downloadm.php" target="_blank" rel="noopener noreferrer" class="mt-3 inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-emerald-400 font-semibold text-xs border border-slate-700 transition">
+              <span>Apri downloadm.php</span>
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
+            </a>
+          </div>
+
+          <div class="bg-slate-950/80 border border-slate-800 rounded-xl p-3.5 flex flex-col justify-between">
+            <div>
+              <div class="flex items-center gap-2 text-cyan-400 font-bold text-xs uppercase mb-1">
+                <span>2. Partite Future (Fixtures)</span>
+              </div>
+              <p class="text-xs text-slate-400 leading-relaxed">
+                Clicca su <strong>"Download fixtures in Excel format"</strong> per scaricare <code class="text-slate-200">fixtures.xlsx</code> con il prossimo turno e le quote.
+              </p>
+            </div>
+            <a href="https://football-data.co.uk/matches.php" target="_blank" rel="noopener noreferrer" class="mt-3 inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-cyan-400 font-semibold text-xs border border-slate-700 transition">
+              <span>Apri matches.php</span>
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
+            </a>
+          </div>
+        </div>
+
+        <!-- Area Upload File -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+          <!-- Upload Storico -->
+          <label class="group border-2 border-dashed border-slate-700 hover:border-emerald-500/70 bg-slate-950/50 rounded-2xl p-4 text-center cursor-pointer transition flex flex-col items-center justify-center gap-2">
+            <div class="w-10 h-10 rounded-full bg-emerald-500/15 text-emerald-400 flex items-center justify-center group-hover:scale-105 transition">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+            </div>
+            <div class="font-bold text-xs text-white">Carica Archivio Risultati (.xlsx / .csv)</div>
+            <div id="historyFileName" class="text-[11px] text-slate-400">Calcola medie gol, Over 2.5, BTTS e forma</div>
+            <input type="file" accept=".xlsx,.xls,.csv" onchange="handleFileUpload(event, 'history')" class="hidden" />
+          </label>
+
+          <!-- Upload Fixtures -->
+          <label class="group border-2 border-dashed border-slate-700 hover:border-cyan-500/70 bg-slate-950/50 rounded-2xl p-4 text-center cursor-pointer transition flex flex-col items-center justify-center gap-2">
+            <div class="w-10 h-10 rounded-full bg-cyan-500/15 text-cyan-400 flex items-center justify-center group-hover:scale-105 transition">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+            </div>
+            <div class="font-bold text-xs text-white">Carica Partite Future (fixtures.xlsx)</div>
+            <div id="fixturesFileName" class="text-[11px] text-slate-400">Popola le giornate future e quote 1X2 / O-U</div>
+            <input type="file" accept=".xlsx,.xls,.csv" onchange="handleFileUpload(event, 'fixtures')" class="hidden" />
+          </label>
+        </div>
+
+        <!-- Mappatura Codici Lega Supportati -->
+        <div class="bg-slate-950/70 border border-slate-800 rounded-xl p-3">
+          <div class="text-[11px] font-bold text-slate-400 uppercase mb-2">Codici Campionato Riconosciuti Automaticamente (Colonna Div / Fogli Excel):</div>
+          <div class="flex flex-wrap gap-1.5 text-[11px] font-mono">
+            <span class="px-2 py-0.5 rounded bg-slate-800 text-emerald-300">I1: Serie A</span>
+            <span class="px-2 py-0.5 rounded bg-slate-800 text-emerald-300">I2: Serie B</span>
+            <span class="px-2 py-0.5 rounded bg-slate-800 text-cyan-300">E0: Premier</span>
+            <span class="px-2 py-0.5 rounded bg-slate-800 text-cyan-300">E1: Championship</span>
+            <span class="px-2 py-0.5 rounded bg-slate-800 text-amber-300">SP1: La Liga</span>
+            <span class="px-2 py-0.5 rounded bg-slate-800 text-amber-300">SP2: La Liga 2</span>
+            <span class="px-2 py-0.5 rounded bg-slate-800 text-rose-300">D1: Bundesliga</span>
+            <span class="px-2 py-0.5 rounded bg-slate-800 text-rose-300">D2: 2. Bundesliga</span>
+            <span class="px-2 py-0.5 rounded bg-slate-800 text-indigo-300">F1: Ligue 1</span>
+            <span class="px-2 py-0.5 rounded bg-slate-800 text-indigo-300">F2: Ligue 2</span>
+          </div>
+        </div>
+
+        <div id="importFeedback" class="hidden rounded-xl p-3 text-xs font-medium"></div>
+      </div>
+
+      <div class="mt-5 pt-4 border-t border-slate-800 flex justify-end gap-2">
+        <button onclick="closeImportModal()" class="px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs cursor-pointer">Conferma e Torna ai Match</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- TOAST NOTIFICATION -->
+  <div id="toastNotification" class="fixed bottom-5 left-1/2 -translate-x-1/2 z-50 hidden px-4 py-2.5 rounded-xl bg-slate-800 border border-emerald-500/40 text-white text-xs font-semibold shadow-2xl flex items-center gap-2">
+    <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+    <span id="toastMessage">Azione completata</span>
+  </div>
+
+  <script>
+    /**
+     * CONFIGURAZIONE NAZIONI E LEGHE (TOP 5 CAMPIONATI EUROPEI + SERIE MINORI)
+     * Mappatura diretta con i codici ufficiali di football-data.co.uk
+     */
+    const COUNTRIES_CONFIG = [
+      {
+        id: 'IT',
+        name: 'Italia',
+        flag: '🇮🇹',
+        accent: 'emerald',
+        leagues: [
+          { code: 'I1', tier: 'Lega A', name: 'Serie A', teamsCount: 20, matchesPerRound: 10 },
+          { code: 'I2', tier: 'Lega B', name: 'Serie B', teamsCount: 20, matchesPerRound: 10 }
+        ]
+      },
+      {
+        id: 'EN',
+        name: 'Inghilterra',
+        flag: '🏴󠁧󠁢󠁥󠁮󠁧󠁿',
+        accent: 'cyan',
+        leagues: [
+          { code: 'E0', tier: 'Lega A', name: 'Premier League', teamsCount: 20, matchesPerRound: 10 },
+          { code: 'E1', tier: 'Lega B', name: 'Championship', teamsCount: 24, matchesPerRound: 12 }
+        ]
+      },
+      {
+        id: 'ES',
+        name: 'Spagna',
+        flag: '🇪🇸',
+        accent: 'amber',
+        leagues: [
+          { code: 'SP1', tier: 'Lega A', name: 'La Liga', teamsCount: 20, matchesPerRound: 10 },
+          { code: 'SP2', tier: 'Lega B', name: 'La Liga 2', teamsCount: 22, matchesPerRound: 11 }
+        ]
+      },
+      {
+        id: 'DE',
+        name: 'Germania',
+        flag: '🇩🇪',
+        accent: 'rose',
+        leagues: [
+          { code: 'D1', tier: 'Lega A', name: 'Bundesliga', teamsCount: 18, matchesPerRound: 9 },
+          { code: 'D2', tier: 'Lega B', name: '2. Bundesliga', teamsCount: 18, matchesPerRound: 9 }
+        ]
+      },
+      {
+        id: 'FR',
+        name: 'Francia',
+        flag: '🇫🇷',
+        accent: 'indigo',
+        leagues: [
+          { code: 'F1', tier: 'Lega A', name: 'Ligue 1', teamsCount: 18, matchesPerRound: 9 },
+          { code: 'F2', tier: 'Lega B', name: 'Ligue 2', teamsCount: 18, matchesPerRound: 9 }
+        ]
+      }
+    ];
+
+    // Mappa inversa rapida da Codice Lega (es. 'I1') a metadati
+    const LEAGUE_META = {};
+    COUNTRIES_CONFIG.forEach(c => {
+      c.leagues.forEach(l => {
+        LEAGUE_META[l.code] = { ...l, countryId: c.id, countryName: c.name, flag: c.flag };
+      });
+    });
+
+    /**
+     * SQUADRE REALI PER GENERAZIONE DATASET DIMOSTRATIVO COMPLETO
+     */
+    const DEMO_TEAMS = {
+      I1: ['Inter', 'Napoli', 'Atalanta', 'Juventus', 'Milan', 'Lazio', 'Fiorentina', 'Bologna', 'Roma', 'Torino', 'Udinese', 'Genoa', 'Cagliari', 'Empoli', 'Parma', 'Como', 'Lecce', 'Verona', 'Monza', 'Venezia'],
+      I2: ['Sassuolo', 'Pisa', 'Spezia', 'Cremonese', 'Palermo', 'Bari', 'Catanzaro', 'Cesena', 'Juve Stabia', 'Modena', 'Brescia', 'Sampdoria', 'Reggiana', 'Mantova', 'Carrarese', 'Salernitana', 'Cittadella', 'Frosinone', 'Sudtirol', 'Cosenza'],
+      E0: ['Liverpool', 'Arsenal', 'Man City', 'Chelsea', 'Newcastle', 'Aston Villa', 'Brighton', 'Tottenham', 'Nottm Forest', 'Fulham', 'Bournemouth', 'Brentford', 'Man United', 'West Ham', 'Crystal Palace', 'Everton', 'Wolves', 'Leicester', 'Ipswich', 'Southampton'],
+      E1: ['Leeds', 'Sheffield United', 'Burnley', 'Sunderland', 'Middlesbrough', 'West Brom', 'Watford', 'Blackburn', 'Norwich', 'Bristol City', 'Millwall', 'Sheffield Weds', 'Coventry', 'Swansea', 'Preston', 'Stoke', 'QPR', 'Derby', 'Oxford', 'Luton', 'Cardiff', 'Portsmouth', 'Plymouth', 'Hull'],
+      SP1: ['Barcelona', 'Real Madrid', 'Ath Madrid', 'Ath Bilbao', 'Villarreal', 'Mallorca', 'Betis', 'Sociedad', 'Girona', 'Osasuna', 'Celta', 'Sevilla', 'Rayo Vallecano', 'Las Palmas', 'Alaves', 'Leganes', 'Getafe', 'Espanyol', 'Valladolid', 'Valencia'],
+      SP2: ['Racing Santander', 'Almeria', 'Mirandes', 'Levante', 'Oviedo', 'Granada', 'Elche', 'Zaragoza', 'Sporting Gijon', 'Huesca', 'Castellon', 'Malaga', 'Eibar', 'Cordoba', 'Albacete', 'Deportivo', 'Burgos', 'Cadiz', 'Eldense', 'Ferrol', 'Tenerife', 'Cartagena'],
+      D1: ['Bayern Munich', 'Ein Frankfurt', 'Leverkusen', 'RB Leipzig', 'Freiburg', 'Dortmund', 'Mainz', 'M\'gladbach', 'Stuttgart', 'Wolfsburg', 'Werder Bremen', 'Union Berlin', 'Augsburg', 'Hoffenheim', 'St Pauli', 'Heidenheim', 'Holstein Kiel', 'Bochum'],
+      D2: ['Paderborn', 'Hamburg', 'Hannover', 'Karlsruhe', 'Elversberg', 'Fortuna Dusseldorf', 'Kaiserslautern', 'FC Koln', 'Magdeburg', 'Nurnberg', 'Hertha', 'Darmstadt', 'Schalke 04', 'Greuther Furth', 'Munster', 'Ulm', 'Braunschweig', 'Regensburg'],
+      F1: ['Paris SG', 'Monaco', 'Marseille', 'Lille', 'Lyon', 'Nice', 'Lens', 'Reims', 'Auxerre', 'Toulouse', 'Strasbourg', 'Brest', 'Rennes', 'Nantes', 'St Etienne', 'Angers', 'Le Havre', 'Montpellier'],
+      F2: ['Paris FC', 'Lorient', 'Metz', 'Dunkerque', 'Annecy', 'Guingamp', 'Laval', 'Bastia', 'Amiens', 'Pau FC', 'Grenoble', 'Rodez', 'Red Star', 'Caen', 'Clermont', 'Ajaccio', 'Troyes', 'Martigues']
+    };
+
+    /**
+     * STATO GLOBALE DELL'APPLICAZIONE
+     */
+    let appState = {
+      selectedCountryId: 'IT',
+      selectedLeagueCode: 'I1',
+      selectedRoundIndex: null, // Indice della giornata selezionata
+      quickFilter: 'ALL',
+      isCustomData: false,
+      historyMatches: [], // Array di match storici (con FTHG, FTAG, FTR)
+      fixtureMatches: [], // Array di match futuri (prossima giornata)
+      comboSelections: [] // Array di pronostici selezionati dall'utente
+    };
+
+    /**
+     * GENERATORE DETERMINISTICO DI DATI DEMO REALISTICI
+     * Crea 12 giornate storiche + 1 giornata futura completa per ciascuno dei 10 campionati
+     */
+    function generateDemoDataset() {
+      const history = [];
+      const fixtures = [];
+
+      // Funzione pseudo-casuale deterministica per dati coerenti al ricaricamento
+      let seed = 202611;
+      const rand = () => {
+        seed = (seed * 16807) % 2147483647;
+        return (seed - 1) / 2147483646;
+      };
+
+      Object.keys(DEMO_TEAMS).forEach(code => {
+        const teams = [...DEMO_TEAMS[code]];
+        const n = teams.length;
+        // Forza base assegnata in base alla posizione in classifica simulata
+        const strength = {};
+        teams.forEach((t, idx) => {
+          strength[t] = 1.85 - (idx / n) * 0.95; // Da 1.85 (top) a 0.90 (fondo)
+        });
+
+        // Genera 12 giornate storiche (round-robin parziale)
+        const numHistoryRounds = 12;
+        for (let r = 1; r <= numHistoryRounds; r++) {
+          const roundDate = new Date(2026, 7, 22 + (r - 1) * 7);
+          const dateStr = formatDateIT(roundDate);
+
+          for (let i = 0; i < n / 2; i++) {
+            const homeIdx = (r + i) % n;
+            const awayIdx = (n - 1 - i + r) % n;
+            if (homeIdx === awayIdx) continue;
+
+            const home = teams[homeIdx];
+            const away = teams[awayIdx];
+
+            // Calcolo gol realistici in base alla forza
+            const expHome = Math.max(0.3, strength[home] * 1.18 + (rand() - 0.4) * 0.8);
+            const expAway = Math.max(0.2, strength[away] * 0.92 + (rand() - 0.4) * 0.8);
+
+            const fthg = Math.min(5, Math.floor(expHome + rand() * 1.1));
+            const ftag = Math.min(4, Math.floor(expAway + rand() * 1.0));
+            const ftr = fthg > ftag ? 'H' : (fthg < ftag ? 'A' : 'D');
+
+            const odds = calculateRealisticOdds(strength[home], strength[away]);
+
+            history.push({
+              Div: code,
+              Round: r,
+              Date: dateStr,
+              Time: i % 3 === 0 ? '20:45' : (i % 2 === 0 ? '18:00' : '15:00'),
+              HomeTeam: home,
+              AwayTeam: away,
+              FTHG: fthg,
+              FTAG: ftag,
+              FTR: ftr,
+              ...odds
+            });
+          }
+        }
+
+        // Genera la 13ª Giornata (Prossima Giornata Futura completa: 10 partite per Serie A, ecc.)
+        const nextRoundNum = numHistoryRounds + 1;
+        const scheduleTimes = ['Sab 15:00', 'Sab 18:00', 'Sab 20:45', 'Dom 12:30', 'Dom 15:00', 'Dom 15:00', 'Dom 15:00', 'Dom 18:00', 'Dom 20:45', 'Lun 20:45', 'Lun 20:45', 'Lun 21:00'];
+
+        // Accoppiamenti bilanciati per la giornata futura
+        for (let i = 0; i < n / 2; i++) {
+          const home = teams[i * 2];
+          const away = teams[i * 2 + 1];
+          const odds = calculateRealisticOdds(strength[home], strength[away]);
+
+          fixtures.push({
+            Div: code,
+            Round: nextRoundNum,
+            Date: 'Prossimo Turno',
+            Time: scheduleTimes[i % scheduleTimes.length],
+            HomeTeam: home,
+            AwayTeam: away,
+            FTHG: null,
+            FTAG: null,
+            FTR: null,
+            isFixture: true,
+            ...odds
+          });
+        }
+      });
+
+      return { history, fixtures };
+    }
+
+    /**
+     * Calcola quote realistiche style Bet365 (B365H, B365D, B365A, Over/Under 2.5)
+     */
+    function calculateRealisticOdds(homeStr, awayStr) {
+      const diff = (homeStr * 1.15) - awayStr;
+      let pH = 0.44 + diff * 0.28;
+      pH = Math.min(0.78, Math.max(0.14, pH));
+      let pD = 0.27 - Math.abs(diff) * 0.05;
+      pD = Math.min(0.32, Math.max(0.18, pD));
+      let pA = Math.max(0.10, 1 - pH - pD);
+
+      const margin = 1.055; // Aggio bookmaker ~5.5%
+      const b365H = +(margin / pH).toFixed(2);
+      const b365D = +(margin / pD).toFixed(2);
+      const b365A = +(margin / pA).toFixed(2);
+
+      const avgTotal = (homeStr + awayStr) * 0.95;
+      const pOver = Math.min(0.72, Math.max(0.32, 0.35 + (avgTotal - 2.1) * 0.25));
+      const b365Over = +(1.05 / pOver).toFixed(2);
+      const b365Under = +(1.05 / (1 - pOver)).toFixed(2);
+
+      return {
+        B365H: b365H,
+        B365D: b365D,
+        B365A: b365A,
+        'B365>2.5': b365Over,
+        'B365<2.5': b365Under
+      };
+    }
+
+    function formatDateIT(d) {
+      const dd = String(d.getDate()).padStart(2, '0');
+      const mm = String(d.getMonth() + 1).padStart(2, '0');
+      const yyyy = d.getFullYear();
+      return `${dd}/${mm}/${yyyy}`;
+    }
+
+    /**
+     * MOTORE STATISTICO PER SQUADRA E PARTITA
+     * Analizza lo storico della lega selezionata per ricavare medie gol, % Over 2.5, % BTTS e forma
+     */
+    function getTeamStats(leagueCode, teamName) {
+      const leagueHistory = appState.historyMatches.filter(m => m.Div === leagueCode && m.FTHG !== null && m.FTAG !== null);
+      const teamMatches = leagueHistory.filter(m => m.HomeTeam === teamName || m.AwayTeam === teamName);
+
+      if (teamMatches.length === 0) {
+        return {
+          played: 0,
+          points: 0,
+          avgScored: 1.35,
+          avgConceded: 1.20,
+          over25Pct: 52,
+          bttsPct: 50,
+          form: ['W', 'D', 'W', 'L', 'W'],
+          homePlayed: 0,
+          homeAvgScored: 1.45,
+          awayPlayed: 0,
+          awayAvgScored: 1.15
+        };
+      }
+
+      let points = 0;
+      let scored = 0;
+      let conceded = 0;
+      let over25 = 0;
+      let btts = 0;
+      let homePlayed = 0, homeScored = 0;
+      let awayPlayed = 0, awayScored = 0;
+      const form = [];
+
+      teamMatches.forEach(m => {
+        const isHome = m.HomeTeam === teamName;
+        const gf = isHome ? Number(m.FTHG) : Number(m.FTAG);
+        const ga = isHome ? Number(m.FTAG) : Number(m.FTHG);
+
+        scored += gf;
+        conceded += ga;
+        if (gf + ga > 2.5) over25++;
+        if (gf > 0 && ga > 0) btts++;
+
+        if (isHome) {
+          homePlayed++;
+          homeScored += gf;
+        } else {
+          awayPlayed++;
+          awayScored += gf;
+        }
+
+        if (gf > ga) {
+          points += 3;
+          form.push('W');
+        } else if (gf === ga) {
+          points += 1;
+          form.push('D');
+        } else {
+          form.push('L');
+        }
+      });
+
+      const played = teamMatches.length;
+      return {
+        played,
+        points,
+        avgScored: +(scored / played).toFixed(2),
+        avgConceded: +(conceded / played).toFixed(2),
+        over25Pct: Math.round((over25 / played) * 100),
+        bttsPct: Math.round((btts / played) * 100),
+        form: form.slice(-5),
+        homePlayed,
+        homeAvgScored: homePlayed ? +(homeScored / homePlayed).toFixed(2) : +(scored / played).toFixed(2),
+        awayPlayed,
+        awayAvgScored: awayPlayed ? +(awayScored / awayPlayed).toFixed(2) : +(scored / played).toFixed(2)
+      };
+    }
+
+    /**
+     * Calcola indicatori combinati per un singolo match (Home vs Away)
+     */
+    function analyzeMatch(match) {
+      const homeStats = getTeamStats(match.Div, match.HomeTeam);
+      const awayStats = getTeamStats(match.Div, match.AwayTeam);
+
+      const expectedGoals = +((homeStats.homeAvgScored + awayStats.avgConceded) / 2 + (awayStats.awayAvgScored + homeStats.avgConceded) / 2).toFixed(2);
+      const combinedOver25 = Math.round((homeStats.over25Pct + awayStats.over25Pct) / 2);
+      const combinedBtts = Math.round((homeStats.bttsPct + awayStats.bttsPct) / 2);
+
+      // Suggerimento statistico intelligente ComboGesss
+      let smartTip = { label: '1X + Over 1.5', badge: 'Combo Sicura', color: 'emerald' };
+      if (combinedOver25 >= 62 && expectedGoals >= 2.75) {
+        smartTip = { label: 'Over 2.5 Gol', badge: `${combinedOver25}% Over`, color: 'cyan' };
+      } else if (combinedBtts >= 60) {
+        smartTip = { label: 'Gol (BTTS)', badge: `${combinedBtts}% Gol`, color: 'amber' };
+      } else if (Number(match.B365H) <= 1.72) {
+        smartTip = { label: '1 Fisso', badge: `Quota ${match.B365H}`, color: 'emerald' };
+      } else if (Number(match.B365A) <= 1.80) {
+        smartTip = { label: '2 Fisso', badge: `Quota ${match.B365A}`, color: 'emerald' };
+      }
+
+      return {
+        homeStats,
+        awayStats,
+        expectedGoals,
+        combinedOver25,
+        combinedBtts,
+        smartTip
+      };
+    }
+
+    /**
+     * RENDERING COLONNA SINISTRA: NAZIONI IN COLONNA
+     */
+    function renderCountries() {
+      const container = document.getElementById('countriesList');
+      container.innerHTML = COUNTRIES_CONFIG.map(country => {
+        const isSelected = country.id === appState.selectedCountryId;
+        const leagueA = country.leagues[0];
+        const leagueB = country.leagues[1];
+
+        return `
+          <button
+            onclick="selectCountry('${country.id}')"
+            class="w-full text-left p-3.5 rounded-xl border transition-all flex items-center justify-between cursor-pointer group ${
+              isSelected
+                ? 'bg-gradient-to-r from-emerald-500/20 via-slate-800/90 to-slate-800/90 border-emerald-500/60 shadow-lg shadow-emerald-500/10'
+                : 'bg-slate-900/70 hover:bg-slate-800/80 border-slate-800 hover:border-slate-700'
+            }"
+          >
+            <div class="flex items-center gap-3">
+              <span class="text-2xl filter drop-shadow">${country.flag}</span>
+              <div>
+                <div class="font-bold text-sm ${isSelected ? 'text-white' : 'text-slate-200 group-hover:text-white'}">${country.name}</div>
+                <div class="text-[11px] text-slate-400 mt-0.5">${leagueA.name} • ${leagueB.name}</div>
+              </div>
+            </div>
+            <div class="flex items-center gap-1.5">
+              <span class="text-[10px] font-mono px-1.5 py-0.5 rounded ${isSelected ? 'bg-emerald-500 text-slate-950 font-bold' : 'bg-slate-800 text-slate-400'}">2 Leghe</span>
+              <svg class="w-4 h-4 transition-transform ${isSelected ? 'text-emerald-400 translate-x-0.5' : 'text-slate-600 group-hover:text-slate-400'}" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" />
+              </svg>
+            </div>
+          </button>
+        `;
+      }).join('');
+    }
+
+    /**
+     * RENDERING PANNELLO DESTRO SUPERIORE: SCELTA LEGA A / LEGA B
+     */
+    function renderDivisionSelector() {
+      const country = COUNTRIES_CONFIG.find(c => c.id === appState.selectedCountryId);
+      if (!country) return;
+
+      document.getElementById('selectedCountryFlag').textContent = country.flag;
+      document.getElementById('selectedCountryName').textContent = country.name;
+
+      const grid = document.getElementById('divisionsGrid');
+      grid.innerHTML = country.leagues.map(league => {
+        const isActive = league.code === appState.selectedLeagueCode;
+        const fixturesCount = appState.fixtureMatches.filter(m => m.Div === league.code).length;
+        const historyCount = appState.historyMatches.filter(m => m.Div === league.code).length;
+
+        return `
+          <button
+            onclick="selectLeague('${league.code}')"
+            class="text-left p-4 rounded-2xl border transition-all cursor-pointer relative overflow-hidden ${
+              isActive
+                ? 'bg-gradient-to-br from-emerald-500/20 via-cyan-500/10 to-slate-900 border-emerald-400 shadow-lg shadow-emerald-500/15'
+                : 'bg-slate-900/80 hover:bg-slate-800/80 border-slate-800 hover:border-slate-700'
+            }"
+          >
+            <div class="flex items-center justify-between mb-2">
+              <span class="text-[11px] font-extrabold uppercase tracking-wider px-2 py-0.5 rounded-md ${
+                league.tier === 'Lega A'
+                  ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                  : 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/30'
+              }">${league.tier}</span>
+              <span class="font-mono text-xs font-bold text-slate-400">Cod: ${league.code}</span>
+            </div>
+
+            <div class="text-base sm:text-lg font-extrabold text-white flex items-center justify-between">
+              <span>${league.name}</span>
+              ${isActive ? '<span class="w-2.5 h-2.5 rounded-full bg-emerald-400 shadow-sm shadow-emerald-400"></span>' : ''}
+            </div>
+
+            <div class="mt-2 pt-2 border-t border-slate-800/80 flex items-center justify-between text-xs text-slate-400">
+              <span>${league.matchesPerRound} partite / giornata</span>
+              <span class="font-mono text-[11px] text-slate-300">${fixturesCount > 0 ? fixturesCount + ' fut.' : historyCount + ' stor.'}</span>
+            </div>
+          </button>
+        `;
+      }).join('');
+    }
+
+    /**
+     * COSTRUISCE LE GIORNATE DISPONIBILI PER IL CAMPIONATO ATTIVO
+     */
+    function getRoundsForLeague(leagueCode) {
+      const roundsMap = new Map();
+
+      // Raggruppa partite storiche per Round
+      const hist = appState.historyMatches.filter(m => m.Div === leagueCode);
+      hist.forEach(m => {
+        const rKey = `H_${m.Round}`;
+        if (!roundsMap.has(rKey)) {
+          roundsMap.set(rKey, {
+            id: rKey,
+            label: `Giornata ${m.Round} (Risultati)`,
+            isFuture: false,
+            roundNum: m.Round,
+            matches: []
+          });
+        }
+        roundsMap.get(rKey).matches.push(m);
+      });
+
+      // Raggruppa partite future (fixtures)
+      const fix = appState.fixtureMatches.filter(m => m.Div === leagueCode);
+      if (fix.length > 0) {
+        // Se i fixtures hanno Round diversi, li raggruppiamo; altrimenti creiamo la Prossima Giornata
+        const byRound = {};
+        fix.forEach(m => {
+          const r = m.Round || 'Next';
+          if (!byRound[r]) byRound[r] = [];
+          byRound[r].push(m);
+        });
+
+        Object.keys(byRound).forEach((rKey, idx) => {
+          const label = rKey === 'Next'
+            ? `Prossima Giornata (${byRound[rKey].length} match)`
+            : `Giornata ${rKey} • Prossimo Turno`;
+          roundsMap.set(`F_${rKey}`, {
+            id: `F_${rKey}`,
+            label,
+            isFuture: true,
+            roundNum: Number(rKey) || 999 + idx,
+            matches: byRound[rKey]
+          });
+        });
+      }
+
+      return Array.from(roundsMap.values());
+    }
+
+    /**
+     * RENDERING INTERA GIORNATA DI PARTITE (es. tutte le 10 partite di Serie A)
+     */
+    function renderMatchday() {
+      const leagueMeta = LEAGUE_META[appState.selectedLeagueCode];
+      if (!leagueMeta) return;
+
+      document.getElementById('activeLeagueBadge').textContent = leagueMeta.code;
+      document.getElementById('activeLeagueTitle').textContent = `${leagueMeta.flag} ${leagueMeta.name}`;
+      document.getElementById('activeLeagueTeamsCount').textContent = `(${leagueMeta.teamsCount} squadre • ${leagueMeta.matchesPerRound} partite/giornata)`;
+
+      const rounds = getRoundsForLeague(leagueMeta.code);
+      const roundSelect = document.getElementById('roundSelect');
+
+      if (rounds.length === 0) {
+        roundSelect.innerHTML = '<option>Nessuna giornata</option>';
+        document.getElementById('matchesContainer').innerHTML = `
+          <div class="text-center py-10 text-slate-400 text-sm">
+            Nessuna partita trovata per ${leagueMeta.name}. Carica il file Excel da football-data.co.uk.
+          </div>`;
+        return;
+      }
+
+      // Di default seleziona l'ultima giornata disponibile (Prossimo Turno)
+      if (appState.selectedRoundIndex === null || appState.selectedRoundIndex >= rounds.length || appState.selectedRoundIndex < 0) {
+        appState.selectedRoundIndex = rounds.length - 1;
+      }
+
+      roundSelect.innerHTML = rounds.map((r, idx) =>
+        `<option value="${idx}" ${idx === appState.selectedRoundIndex ? 'selected' : ''}>${r.label}</option>`
+      ).join('');
+
+      document.getElementById('prevRoundBtn').disabled = appState.selectedRoundIndex <= 0;
+      document.getElementById('nextRoundBtn').disabled = appState.selectedRoundIndex >= rounds.length - 1;
+
+      const currentRound = rounds[appState.selectedRoundIndex];
+      document.getElementById('activeRoundSubtitle').textContent = currentRound.isFuture
+        ? `${currentRound.matches.length} partite in programma • Clicca sulle quote per creare la tua Combo`
+        : `Risultati ufficiali ${currentRound.label} • Clicca su un match per l'analisi statistica`;
+
+      // Calcolo media gol della lega sullo storico
+      const leagueHist = appState.historyMatches.filter(m => m.Div === leagueMeta.code && m.FTHG !== null);
+      if (leagueHist.length > 0) {
+        const totalGoals = leagueHist.reduce((acc, m) => acc + Number(m.FTHG) + Number(m.FTAG), 0);
+        document.getElementById('leagueAvgGoals').textContent = (totalGoals / leagueHist.length).toFixed(2);
+      }
+
+      // Analizza tutti i match della giornata
+      const analyzedMatches = currentRound.matches.map((m, idx) => ({
+        match: m,
+        idx,
+        analysis: analyzeMatch(m)
+      }));
+
+      document.getElementById('countAll').textContent = analyzedMatches.length;
+
+      // Applica filtro rapido
+      const filtered = analyzedMatches.filter(item => {
+        if (appState.quickFilter === 'OVER25') return item.analysis.combinedOver25 >= 55;
+        if (appState.quickFilter === 'BTTS') return item.analysis.combinedBtts >= 55;
+        if (appState.quickFilter === 'HOME_STRONG') return Number(item.match.B365H) <= 1.95;
+        return true;
+      });
+
+      const container = document.getElementById('matchesContainer');
+      if (filtered.length === 0) {
+        container.innerHTML = `
+          <div class="bg-slate-900/70 border border-slate-800 rounded-xl p-6 text-center text-xs text-slate-400">
+            Nessuna partita della giornata soddisfa questo filtro rapido. <button onclick="setQuickFilter('ALL')" class="text-emerald-400 underline ml-1 cursor-pointer">Mostra tutte (${analyzedMatches.length})</button>
+          </div>`;
+        return;
+      }
+
+      container.innerHTML = filtered.map(({ match, idx, analysis }) => {
+        const matchId = `${match.Div}_${match.HomeTeam}_${match.AwayTeam}`.replace(/\s+/g, '_');
+        const isPlayed = match.FTHG !== null && match.FTAG !== null && match.FTHG !== '';
+
+        // Verifica quali quote sono già in schedina
+        const isSelected = (market) => appState.comboSelections.some(s => s.matchId === matchId && s.market === market);
+
+        return `
+          <div class="bg-slate-900/90 hover:bg-slate-850 border border-slate-800 hover:border-slate-700 rounded-2xl p-3.5 sm:p-4 transition-all">
+            <!-- Top Row: Numero Match, Orario, Badge Statistico Smart -->
+            <div class="flex flex-wrap items-center justify-between gap-2 pb-2.5 border-b border-slate-800/80 text-[11px]">
+              <div class="flex items-center gap-2 text-slate-400">
+                <span class="font-mono font-bold text-slate-500">#${idx + 1}</span>
+                <span class="px-2 py-0.5 rounded bg-slate-800 text-slate-300 font-medium">${match.Date} ${match.Time ? '• ' + match.Time : ''}</span>
+              </div>
+
+              <div class="flex items-center gap-2">
+                <span class="px-2 py-0.5 rounded-md font-semibold bg-${analysis.smartTip.color}-500/15 text-${analysis.smartTip.color}-400 border border-${analysis.smartTip.color}-500/30">
+                  💡 ${analysis.smartTip.label} (${analysis.smartTip.badge})
+                </span>
+                <button onclick='openMatchDetail(${JSON.stringify(match).replace(/'/g, "&#39;")})' class="px-2 py-0.5 rounded-md bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold transition cursor-pointer">
+                  Statistiche →
+                </button>
+              </div>
+            </div>
+
+            <!-- Middle Row: Squadre + Forma + Risultato/xG -->
+            <div class="py-3 grid grid-cols-1 sm:grid-cols-12 gap-3 items-center">
+              <!-- Squadre e Forma -->
+              <div class="sm:col-span-6 space-y-2 cursor-pointer" onclick='openMatchDetail(${JSON.stringify(match).replace(/'/g, "&#39;")})'>
+                <!-- Casa -->
+                <div class="flex items-center justify-between gap-2">
+                  <div class="flex items-center gap-2 min-w-0">
+                    <span class="w-2 h-2 rounded-full bg-emerald-400 shrink-0"></span>
+                    <span class="font-bold text-sm text-white truncate">${match.HomeTeam}</span>
+                  </div>
+                  <div class="flex items-center gap-1 shrink-0">
+                    ${renderFormDots(analysis.homeStats.form)}
+                    ${isPlayed ? `<span class="ml-2 font-mono font-extrabold text-base text-white">${match.FTHG}</span>` : ''}
+                  </div>
+                </div>
+
+                <!-- Trasferta -->
+                <div class="flex items-center justify-between gap-2">
+                  <div class="flex items-center gap-2 min-w-0">
+                    <span class="w-2 h-2 rounded-full bg-cyan-400 shrink-0"></span>
+                    <span class="font-bold text-sm text-slate-200 truncate">${match.AwayTeam}</span>
+                  </div>
+                  <div class="flex items-center gap-1 shrink-0">
+                    ${renderFormDots(analysis.awayStats.form)}
+                    ${isPlayed ? `<span class="ml-2 font-mono font-extrabold text-base text-white">${match.FTAG}</span>` : ''}
+                  </div>
+                </div>
+              </div>
+
+              <!-- Pillole Statistiche Rapide -->
+              <div class="sm:col-span-6 grid grid-cols-3 gap-1.5 text-center">
+                <div class="bg-slate-950/70 border border-slate-800/90 rounded-xl p-2">
+                  <div class="text-[10px] text-slate-500 uppercase">Gol Attesi</div>
+                  <div class="font-mono font-bold text-xs text-white mt-0.5">${analysis.expectedGoals}</div>
+                </div>
+                <div class="bg-slate-950/70 border border-slate-800/90 rounded-xl p-2">
+                  <div class="text-[10px] text-slate-500 uppercase">Over 2.5</div>
+                  <div class="font-mono font-bold text-xs ${analysis.combinedOver25 >= 58 ? 'text-emerald-400' : 'text-slate-300'} mt-0.5">${analysis.combinedOver25}%</div>
+                </div>
+                <div class="bg-slate-950/70 border border-slate-800/90 rounded-xl p-2">
+                  <div class="text-[10px] text-slate-500 uppercase">Gol (BTTS)</div>
+                  <div class="font-mono font-bold text-xs ${analysis.combinedBtts >= 58 ? 'text-cyan-400' : 'text-slate-300'} mt-0.5">${analysis.combinedBtts}%</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Bottom Row: Bottoni Quote Interattive (1, X, 2, Over 2.5, Under 2.5) -->
+            <div class="pt-2.5 border-t border-slate-800/70 grid grid-cols-5 gap-1.5">
+              ${renderOddButton(matchId, match, '1', match.B365H, isSelected('1'))}
+              ${renderOddButton(matchId, match, 'X', match.B365D, isSelected('X'))}
+              ${renderOddButton(matchId, match, '2', match.B365A, isSelected('2'))}
+              ${renderOddButton(matchId, match, 'Ov 2.5', match['B365>2.5'], isSelected('Ov 2.5'))}
+              ${renderOddButton(matchId, match, 'Un 2.5', match['B365<2.5'], isSelected('Un 2.5'))}
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function renderFormDots(formArr) {
+      return formArr.map(res => {
+        const bg = res === 'W' ? 'bg-emerald-500 text-slate-950' : (res === 'D' ? 'bg-amber-400 text-slate-950' : 'bg-rose-500/80 text-white');
+        const label = res === 'W' ? 'V' : (res === 'D' ? 'P' : 'S');
+        return `<span class="w-4 h-4 rounded text-[9px] font-extrabold flex items-center justify-center ${bg}">${label}</span>`;
+      }).join('');
+    }
+
+    function renderOddButton(matchId, match, market, oddValue, active) {
+      const val = oddValue ? Number(oddValue).toFixed(2) : '-';
+      const disabled = !oddValue || isNaN(Number(oddValue));
+      return `
+        <button
+          ${disabled ? 'disabled' : ''}
+          onclick='toggleComboSelection("${matchId}", "${match.Div}", "${match.HomeTeam.replace(/"/g, '&quot;')}", "${match.AwayTeam.replace(/"/g, '&quot;')}", "${market}", ${Number(oddValue) || 1})'
+          class="odd-btn py-1.5 px-1 rounded-xl border text-center cursor-pointer flex flex-col items-center justify-center ${
+            active
+              ? 'bg-emerald-500 border-emerald-400 text-slate-950 shadow-md shadow-emerald-500/20'
+              : 'bg-slate-950/90 hover:bg-slate-800 border-slate-800 text-slate-300'
+          } ${disabled ? 'opacity-40 cursor-not-allowed' : ''}"
+        >
+          <span class="text-[10px] font-semibold ${active ? 'text-slate-900' : 'text-slate-500'}">${market}</span>
+          <span class="font-mono text-xs font-extrabold ${active ? 'text-slate-950' : 'text-white'}">${val}</span>
+        </button>
+      `;
+    }
+
+    /**
+     * MODALE DETTAGLIO STATISTICO APPROFONDITO DEL MATCH
+     */
+    function openMatchDetail(match) {
+      const analysis = analyzeMatch(match);
+      const { homeStats, awayStats } = analysis;
+      const meta = LEAGUE_META[match.Div] || { name: match.Div, flag: '⚽' };
+
+      const content = document.getElementById('matchDetailContent');
+      content.innerHTML = `
+        <div class="flex items-center justify-between pb-4 border-b border-slate-800">
+          <div class="flex items-center gap-2 text-xs text-slate-400">
+            <span>${meta.flag} ${meta.name}</span>
+            <span>•</span>
+            <span>${match.Date} ${match.Time || ''}</span>
+          </div>
+          <button onclick="closeMatchDetail()" class="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 cursor-pointer">✕</button>
+        </div>
+
+        <!-- Intestazione Squadre -->
+        <div class="py-5 grid grid-cols-3 items-center text-center gap-2">
+          <div>
+            <div class="w-12 h-12 mx-auto rounded-2xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-emerald-400 font-extrabold text-lg mb-2">
+              ${match.HomeTeam.substring(0, 3).toUpperCase()}
+            </div>
+            <div class="font-extrabold text-base sm:text-lg text-white">${match.HomeTeam}</div>
+            <div class="text-xs text-slate-400 mt-1">Casa • ${homeStats.points} pt (${homeStats.played}G)</div>
+          </div>
+
+          <div class="flex flex-col items-center">
+            <span class="text-xs font-bold uppercase tracking-widest text-slate-500 mb-1">VS</span>
+            <div class="px-3 py-1.5 rounded-xl bg-slate-950 border border-slate-800 font-mono text-sm font-extrabold text-cyan-400">
+              xG: ${analysis.expectedGoals}
+            </div>
+            <span class="mt-2 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+              Consiglio: ${analysis.smartTip.label}
+            </span>
+          </div>
+
+          <div>
+            <div class="w-12 h-12 mx-auto rounded-2xl bg-cyan-500/15 border border-cyan-500/30 flex items-center justify-center text-cyan-400 font-extrabold text-lg mb-2">
+              ${match.AwayTeam.substring(0, 3).toUpperCase()}
+            </div>
+            <div class="font-extrabold text-base sm:text-lg text-white">${match.AwayTeam}</div>
+            <div class="text-xs text-slate-400 mt-1">Trasferta • ${awayStats.points} pt (${awayStats.played}G)</div>
+          </div>
+        </div>
+
+        <!-- Tabella Comparativa Statistiche Storiche -->
+        <div class="bg-slate-950/80 border border-slate-800 rounded-2xl p-4 space-y-3 text-xs">
+          <div class="text-[11px] font-bold uppercase tracking-wider text-slate-400 text-center pb-2 border-b border-slate-800/80">
+            Confronto Statistico Stagionale (Calcolato su dati storici)
+          </div>
+
+          ${renderStatCompareRow('Media Gol Fatti / Partita', homeStats.avgScored, awayStats.avgScored)}
+          ${renderStatCompareRow('Media Gol Subiti / Partita', homeStats.avgConceded, awayStats.avgConceded)}
+          ${renderStatCompareRow('Media Gol Casa / Trasferta', homeStats.homeAvgScored, awayStats.awayAvgScored)}
+          ${renderStatCompareRow('Frequenza Over 2.5 (%)', homeStats.over25Pct + '%', awayStats.over25Pct + '%')}
+          ${renderStatCompareRow('Frequenza Gol / BTTS (%)', homeStats.bttsPct + '%', awayStats.bttsPct + '%')}
+
+          <div class="pt-2 border-t border-slate-800/80 flex items-center justify-between">
+            <div class="flex items-center gap-1">${renderFormDots(homeStats.form)}</div>
+            <span class="text-slate-400 font-semibold">Forma Ultime 5</span>
+            <div class="flex items-center gap-1">${renderFormDots(awayStats.form)}</div>
+          </div>
+        </div>
+
+        <!-- Quote Principali -->
+        <div class="mt-4">
+          <div class="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-2">Quote Medie Rilevate</div>
+          <div class="grid grid-cols-5 gap-2">
+            <div class="bg-slate-800/70 rounded-xl p-2 text-center">
+              <div class="text-[10px] text-slate-400">1</div>
+              <div class="font-mono font-bold text-sm text-white">${match.B365H || '-'}</div>
+            </div>
+            <div class="bg-slate-800/70 rounded-xl p-2 text-center">
+              <div class="text-[10px] text-slate-400">X</div>
+              <div class="font-mono font-bold text-sm text-white">${match.B365D || '-'}</div>
+            </div>
+            <div class="bg-slate-800/70 rounded-xl p-2 text-center">
+              <div class="text-[10px] text-slate-400">2</div>
+              <div class="font-mono font-bold text-sm text-white">${match.B365A || '-'}</div>
+            </div>
+            <div class="bg-slate-800/70 rounded-xl p-2 text-center">
+              <div class="text-[10px] text-slate-400">Over 2.5</div>
+              <div class="font-mono font-bold text-sm text-emerald-400">${match['B365>2.5'] || '-'}</div>
+            </div>
+            <div class="bg-slate-800/70 rounded-xl p-2 text-center">
+              <div class="text-[10px] text-slate-400">Under 2.5</div>
+              <div class="font-mono font-bold text-sm text-cyan-400">${match['B365<2.5'] || '-'}</div>
+            </div>
+          </div>
+        </div>
+      `;
+
+      const modal = document.getElementById('matchDetailModal');
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+    }
+
+    function renderStatCompareRow(label, leftVal, rightVal) {
+      return `
+        <div class="flex items-center justify-between py-1">
+          <span class="font-mono font-bold text-emerald-400 w-16 text-left">${leftVal}</span>
+          <span class="text-slate-300 font-medium text-center flex-1">${label}</span>
+          <span class="font-mono font-bold text-cyan-400 w-16 text-right">${rightVal}</span>
+        </div>
+      `;
+    }
+
+    function closeMatchDetail() {
+      const modal = document.getElementById('matchDetailModal');
+      modal.classList.add('hidden');
+      modal.classList.remove('flex');
+    }
+
+    /**
+     * GESTIONE COMBO BUILDER (SCHEDINA PRONOSTICI)
+     */
+    function toggleComboSelection(matchId, div, homeTeam, awayTeam, market, odd) {
+      const existingIdx = appState.comboSelections.findIndex(s => s.matchId === matchId);
+
+      if (existingIdx !== -1) {
+        // Se clicco la stessa identica quota, la rimuovo; altrimenti sostituisco l'esito per quella partita
+        if (appState.comboSelections[existingIdx].market === market) {
+          appState.comboSelections.splice(existingIdx, 1);
+        } else {
+          appState.comboSelections[existingIdx] = { matchId, div, homeTeam, awayTeam, market, odd };
+        }
+      } else {
+        appState.comboSelections.push({ matchId, div, homeTeam, awayTeam, market, odd });
+      }
+
+      renderMatchday();
+      renderCombo();
+    }
+
+    function removeComboItem(index) {
+      appState.comboSelections.splice(index, 1);
+      renderMatchday();
+      renderCombo();
+    }
+
+    function clearCombo() {
+      appState.comboSelections = [];
+      renderMatchday();
+      renderCombo();
+    }
+
+    function renderCombo() {
+      const listDesktop = document.getElementById('comboList');
+      const listMobile = document.getElementById('mobileComboList');
+      const count = appState.comboSelections.length;
+
+      document.getElementById('comboEventsCount').textContent = count;
+      document.getElementById('mobileComboCount').textContent = count;
+
+      if (count === 0) {
+        const emptyHtml = `
+          <div class="text-center py-8 px-3 text-xs text-slate-500 border border-dashed border-slate-800 rounded-xl">
+            Nessun pronostico selezionato.<br/>Clicca sulle quote <span class="text-slate-300 font-semibold">1, X, 2, Over/Under</span> delle partite per costruire la tua Combo.
+          </div>`;
+        listDesktop.innerHTML = emptyHtml;
+        listMobile.innerHTML = emptyHtml;
+        document.getElementById('comboTotalOdd').textContent = '1.00';
+        document.getElementById('mobileComboTotalOdd').textContent = '1.00';
+        document.getElementById('comboStatProb').textContent = '0.0%';
+        document.getElementById('potentialWin').textContent = '€ 0.00';
+        return;
+      }
+
+      const itemsHtml = appState.comboSelections.map((item, idx) => {
+        const meta = LEAGUE_META[item.div] || { flag: '⚽', name: item.div };
+        return `
+          <div class="bg-slate-900/95 border border-slate-800 rounded-xl p-2.5 flex items-center justify-between gap-2 animate-in">
+            <div class="min-w-0">
+              <div class="text-[10px] text-slate-400 flex items-center gap-1">
+                <span>${meta.flag}</span>
+                <span class="truncate">${meta.name}</span>
+              </div>
+              <div class="text-xs font-bold text-white truncate mt-0.5">${item.homeTeam} - ${item.awayTeam}</div>
+              <div class="mt-1 inline-flex items-center gap-1.5">
+                <span class="px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-bold text-[10px]">Esito: ${item.market}</span>
+              </div>
+            </div>
+            <div class="flex items-center gap-2 shrink-0">
+              <span class="font-mono font-extrabold text-sm text-cyan-400">${item.odd.toFixed(2)}</span>
+              <button onclick="removeComboItem(${idx})" class="p-1 rounded-lg hover:bg-slate-800 text-slate-500 hover:text-rose-400 cursor-pointer">✕</button>
+            </div>
+          </div>
+        `;
+      }).join('');
+
+      listDesktop.innerHTML = itemsHtml;
+      listMobile.innerHTML = itemsHtml;
+
+      const totalOdd = appState.comboSelections.reduce((acc, item) => acc * item.odd, 1);
+      // Probabilità implicita netta stimata
+      const impliedProb = appState.comboSelections.reduce((acc, item) => acc * (0.95 / item.odd), 1) * 100;
+      const stake = Math.max(1, Number(document.getElementById('stakeInput').value) || 10);
+      const win = totalOdd * stake;
+
+      document.getElementById('comboTotalOdd').textContent = totalOdd.toFixed(2);
+      document.getElementById('mobileComboTotalOdd').textContent = totalOdd.toFixed(2);
+      document.getElementById('comboStatProb').textContent = `${Math.min(99.9, impliedProb).toFixed(1)}%`;
+      document.getElementById('potentialWin').textContent = `€ ${win.toFixed(2)}`;
+    }
+
+    function copyComboToClipboard() {
+      if (appState.comboSelections.length === 0) {
+        showToast('Aggiungi almeno un pronostico alla Combo!');
+        return;
+      }
+
+      const lines = ['⚽ SCHEDINA COMBOGESSS ⚽', '-------------------------'];
+      appState.comboSelections.forEach((s, i) => {
+        lines.push(`${i + 1}. [${s.div}] ${s.homeTeam} - ${s.awayTeam} => ${s.market} (@${s.odd.toFixed(2)})`);
+      });
+      const totalOdd = appState.comboSelections.reduce((acc, s) => acc * s.odd, 1).toFixed(2);
+      lines.push('-------------------------');
+      lines.push(`Quota Totale: ${totalOdd}`);
+
+      const textarea = document.createElement('textarea');
+      textarea.value = lines.join('\n');
+      document.body.appendChild(textarea);
+      textarea.select();
+      document.execCommand('copy');
+      document.body.removeChild(textarea);
+
+      showToast('Pronostico Combo copiato negli appunti!');
+    }
+
+    /**
+     * IMPORTAZIONE REALE FILE EXCEL / CSV DA FOOTBALL-DATA.CO.UK (TRAMITE SHEETJS)
+     */
+    function handleFileUpload(event, type) {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      const feedback = document.getElementById('importFeedback');
+      feedback.classList.remove('hidden', 'bg-rose-500/15', 'text-rose-300', 'bg-emerald-500/15', 'text-emerald-300');
+      feedback.classList.add('bg-slate-800', 'text-slate-200');
+      feedback.textContent = `Lettura file "${file.name}" in corso...`;
+
+      const reader = new FileReader();
+      reader.onload = function (e) {
+        try {
+          const data = new Uint8Array(e.target.result);
+          const workbook = XLSX.read(data, { type: 'array' });
+
+          let importedRows = [];
+          const supportedDivs = Object.keys(LEAGUE_META);
+
+          // Itera tutti i fogli dell'Excel (es. all-euro-data-2025-2026.xlsx ha un foglio per ogni lega: I1, I2, E0, E1...)
+          workbook.SheetNames.forEach(sheetName => {
+            const sheet = workbook.Sheets[sheetName];
+            const jsonRows = XLSX.utils.sheet_to_json(sheet, { defval: null });
+
+            jsonRows.forEach(row => {
+              // Determina il codice campionato dalla colonna 'Div' o dal nome del foglio
+              const divCode = (row.Div || sheetName || '').toString().trim().toUpperCase();
+              if (!supportedDivs.includes(divCode)) return;
+              if (!row.HomeTeam || !row.AwayTeam) return;
+
+              const normalizedMatch = {
+                Div: divCode,
+                Round: row.Round || null,
+                Date: formatExcelDate(row.Date),
+                Time: row.Time ? row.Time.toString() : '',
+                HomeTeam: row.HomeTeam.toString().trim(),
+                AwayTeam: row.AwayTeam.toString().trim(),
+                FTHG: row.FTHG !== null && row.FTHG !== '' ? Number(row.FTHG) : null,
+                FTAG: row.FTAG !== null && row.FTAG !== '' ? Number(row.FTAG) : null,
+                FTR: row.FTR || null,
+                B365H: row.B365H || row.AvgH || row.PSH || null,
+                B365D: row.B365D || row.AvgD || row.PSD || null,
+                B365A: row.B365A || row.AvgA || row.PSA || null,
+                'B365>2.5': row['B365>2.5'] || row['Avg>2.5'] || row['P>2.5'] || null,
+                'B365<2.5': row['B365<2.5'] || row['Avg<2.5'] || row['P<2.5'] || null
+              };
+
+              importedRows.push(normalizedMatch);
+            });
+          });
+
+          if (importedRows.length === 0) {
+            throw new Error('Nessuna riga valida trovata per i top 5 campionati europei (I1, I2, E0, E1, SP1, SP2, D1, D2, F1, F2).');
+          }
+
+          if (type === 'history') {
+            // Assegna numero giornata progressivo per ogni lega in base all'ordine cronologico
+            const byDiv = {};
+            importedRows.forEach(r => {
+              if (!byDiv[r.Div]) byDiv[r.Div] = [];
+              byDiv[r.Div].push(r);
+            });
+
+            Object.keys(byDiv).forEach(div => {
+              const perRound = LEAGUE_META[div].matchesPerRound || 10;
+              byDiv[div].forEach((m, idx) => {
+                m.Round = Math.floor(idx / perRound) + 1;
+              });
+            });
+
+            appState.historyMatches = importedRows;
+            document.getElementById('historyFileName').textContent = `✅ ${file.name} (${importedRows.length} match)`;
+          } else {
+            // Fixtures (partite future)
+            importedRows.forEach(m => { m.isFixture = true; m.Round = 'Next'; });
+            appState.fixtureMatches = importedRows;
+            document.getElementById('fixturesFileName').textContent = `✅ ${file.name} (${importedRows.length} match)`;
+          }
+
+          appState.isCustomData = true;
+          appState.selectedRoundIndex = null;
+          saveToLocalStorage();
+          updateDataSourceUI();
+          renderDivisionSelector();
+          renderMatchday();
+
+          feedback.classList.remove('bg-slate-800', 'text-slate-200');
+          feedback.classList.add('bg-emerald-500/15', 'text-emerald-300', 'border', 'border-emerald-500/30');
+          feedback.textContent = `Importazione completata! Caricate ${importedRows.length} partite ufficiali nei campionati supportati.`;
+          showToast(`Dati aggiornati da ${file.name}`);
+        } catch (err) {
+          feedback.classList.remove('bg-slate-800', 'text-slate-200');
+          feedback.classList.add('bg-rose-500/15', 'text-rose-300', 'border', 'border-rose-500/30');
+          feedback.textContent = `Errore durante la lettura: ${err.message}`;
+        }
+      };
+      reader.readAsArrayBuffer(file);
+    }
+
+    function formatExcelDate(val) {
+      if (!val) return '';
+      if (typeof val === 'number') {
+        // Numero seriale data Excel
+        const date = new Date(Math.round((val - 25569) * 86400 * 1000));
+        return formatDateIT(date);
+      }
+      return val.toString();
+    }
+
+    /**
+     * PERSISTENZA IN LOCALSTORAGE E GESTIONE STATO
+     */
+    function saveToLocalStorage() {
+      try {
+        localStorage.setItem('combogesss_data_v1', JSON.stringify({
+          isCustomData: appState.isCustomData,
+          historyMatches: appState.historyMatches,
+          fixtureMatches: appState.fixtureMatches
+        }));
+      } catch (e) {
+        console.warn('LocalStorage pieno o non disponibile', e);
+      }
+    }
+
+    function loadInitialData() {
+      try {
+        const saved = localStorage.getItem('combogesss_data_v1');
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (parsed && parsed.isCustomData && (parsed.historyMatches?.length || parsed.fixtureMatches?.length)) {
+            appState.isCustomData = true;
+            appState.historyMatches = parsed.historyMatches || [];
+            appState.fixtureMatches = parsed.fixtureMatches || [];
+            return;
+          }
+        }
+      } catch (e) {
+        console.warn('Errore lettura localStorage', e);
+      }
+
+      const demo = generateDemoDataset();
+      appState.isCustomData = false;
+      appState.historyMatches = demo.history;
+      appState.fixtureMatches = demo.fixtures;
+    }
+
+    function resetToDemoData() {
+      localStorage.removeItem('combogesss_data_v1');
+      const demo = generateDemoDataset();
+      appState.isCustomData = false;
+      appState.historyMatches = demo.history;
+      appState.fixtureMatches = demo.fixtures;
+      appState.selectedRoundIndex = null;
+      updateDataSourceUI();
+      renderDivisionSelector();
+      renderMatchday();
+      showToast('Dataset dimostrativo ripristinato');
+    }
+
+    function updateDataSourceUI() {
+      const dot = document.getElementById('dataSourceDot');
+      const label = document.getElementById('dataSourceLabel');
+      const resetBtn = document.getElementById('resetDemoBtn');
+
+      if (appState.isCustomData) {
+        dot.className = 'w-2 h-2 rounded-full bg-emerald-400';
+        label.textContent = 'Dati Reali (football-data.co.uk)';
+        resetBtn.classList.remove('hidden');
+      } else {
+        dot.className = 'w-2 h-2 rounded-full bg-amber-400 animate-pulse';
+        label.textContent = 'Dataset Demo (Esplorabile)';
+        resetBtn.classList.add('hidden');
+      }
+
+      document.getElementById('statTotalHistory').textContent = appState.historyMatches.length;
+      document.getElementById('statTotalFixtures').textContent = appState.fixtureMatches.length;
+    }
+
+    /**
+     * AZIONI DI NAVIGAZIONE E FILTRI
+     */
+    function selectCountry(countryId) {
+      appState.selectedCountryId = countryId;
+      const country = COUNTRIES_CONFIG.find(c => c.id === countryId);
+      // Di default seleziona la Lega A (prima divisione) della nazione scelta
+      if (country && country.leagues.length > 0) {
+        appState.selectedLeagueCode = country.leagues[0].code;
+      }
+      appState.selectedRoundIndex = null;
+      appState.quickFilter = 'ALL';
+      updateFilterChipsUI();
+      renderCountries();
+      renderDivisionSelector();
+      renderMatchday();
+    }
+
+    function selectLeague(leagueCode) {
+      appState.selectedLeagueCode = leagueCode;
+      appState.selectedRoundIndex = null;
+      appState.quickFilter = 'ALL';
+      updateFilterChipsUI();
+      renderDivisionSelector();
+      renderMatchday();
+    }
+
+    function selectRound(idx) {
+      appState.selectedRoundIndex = Number(idx);
+      renderMatchday();
+    }
+
+    function changeMatchday(delta) {
+      appState.selectedRoundIndex += delta;
+      renderMatchday();
+    }
+
+    function setQuickFilter(filter) {
+      appState.quickFilter = filter;
+      updateFilterChipsUI();
+      renderMatchday();
+    }
+
+    function updateFilterChipsUI() {
+      document.querySelectorAll('.filter-chip').forEach(btn => {
+        if (btn.dataset.filter === appState.quickFilter) {
+          btn.className = 'filter-chip px-2.5 py-1 rounded-lg font-semibold bg-emerald-500 text-slate-950 cursor-pointer';
+        } else {
+          btn.className = 'filter-chip px-2.5 py-1 rounded-lg font-medium bg-slate-800/90 text-slate-300 hover:bg-slate-700 cursor-pointer';
+        }
+      });
+    }
+
+    function resetToHome() {
+      selectCountry('IT');
+    }
+
+    function openImportModal() {
+      const modal = document.getElementById('importModal');
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+    }
+
+    function closeImportModal() {
+      const modal = document.getElementById('importModal');
+      modal.classList.add('hidden');
+      modal.classList.remove('flex');
+    }
+
+    function toggleComboDrawer() {
+      const drawer = document.getElementById('mobileComboDrawer');
+      drawer.classList.toggle('hidden');
+    }
+
+    function showToast(msg) {
+      const toast = document.getElementById('toastNotification');
+      document.getElementById('toastMessage').textContent = msg;
+      toast.classList.remove('hidden');
+      clearTimeout(window._toastTimer);
+      window._toastTimer = setTimeout(() => {
+        toast.classList.add('hidden');
+      }, 3000);
+    }
+
+    // Chiusura modali cliccando fuori
+    window.addEventListener('click', (e) => {
+      if (e.target === document.getElementById('matchDetailModal')) closeMatchDetail();
+      if (e.target === document.getElementById('importModal')) closeImportModal();
+      if (e.target === document.getElementById('mobileComboDrawer')) toggleComboDrawer();
+    });
+
+    // INIZIALIZZAZIONE AL CARICAMENTO PAGINA
+    window.onload = function () {
+      loadInitialData();
+      updateDataSourceUI();
+      renderCountries();
+      renderDivisionSelector();
+      renderMatchday();
+      renderCombo();
+    };
+  </script>
+</body>
+</html>
