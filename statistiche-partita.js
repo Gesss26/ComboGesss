@@ -52,6 +52,18 @@
         border-color: rgba(250, 204, 21, 0.75) !important;
         box-shadow: 0 0 16px rgba(250, 204, 21, 0.2);
       }
+      .hist-win {
+        background: rgba(16, 185, 129, 0.16);
+        border-color: rgba(16, 185, 129, 0.55);
+      }
+      .hist-draw {
+        background: rgba(234, 179, 8, 0.16);
+        border-color: rgba(234, 179, 8, 0.55);
+      }
+      .hist-loss {
+        background: rgba(239, 68, 68, 0.16);
+        border-color: rgba(239, 68, 68, 0.55);
+      }
     `;
     document.head.appendChild(style);
   }
@@ -157,8 +169,9 @@
         return (h === target || a === target) && Number.isFinite(hg) && Number.isFinite(ag);
       })
       .map(r => {
-        const h = String(r.HomeTeam || r.Home || "").trim().toLowerCase();
-        const isHome = h === target;
+        const rawHome = String(r.HomeTeam || r.Home || "").trim();
+        const rawAway = String(r.AwayTeam || r.Away || "").trim();
+        const isHome = rawHome.toLowerCase() === target;
         const hg = Number(r.FTHG);
         const ag = Number(r.FTAG);
         const gf = isHome ? hg : ag;
@@ -173,8 +186,14 @@
 
         return {
           isHome,
+          opponent: isHome ? rawAway : rawHome,
+          homeName: rawHome,
+          awayName: rawAway,
+          hg,
+          ag,
           gf,
           ga,
+          date: formatMatchDate(r.Date),
           totalGoals,
           btts: hg > 0 && ag > 0,
           outcome,
@@ -202,6 +221,280 @@
       : Number(((avgScored * 0.62) + (avgConceded * 0.38)).toFixed(2));
 
     return { avgScored, avgConceded, xg };
+  }
+
+  function poissonPmf(k, lambda) {
+    const l = Math.max(0.01, lambda);
+    let logP = -l + k * Math.log(l);
+    for (let i = 2; i <= k; i++) {
+      logP -= Math.log(i);
+    }
+    return Math.exp(logP);
+  }
+
+  function dixonColesTau(x, y, lambdaHome, lambdaAway, rho = -0.06) {
+    if (x === 0 && y === 0) return Math.max(0.01, 1 - lambdaHome * lambdaAway * rho);
+    if (x === 0 && y === 1) return Math.max(0.01, 1 + lambdaHome * rho);
+    if (x === 1 && y === 0) return Math.max(0.01, 1 + lambdaAway * rho);
+    if (x === 1 && y === 1) return Math.max(0.01, 1 - rho);
+    return 1;
+  }
+
+  function buildFamiliesFromRates(match, rates, jointBoost = 1.06) {
+    const {
+      p1, px, p2,
+      p1X, pX2, p12,
+      ov15, ov25, ov35, ov45,
+      un15, un25, un35, un45,
+      gg, ng,
+      mg14, mg25
+    } = rates;
+
+    const joint = (aPct, bPct, boost = jointBoost) =>
+      Math.min(98, Math.max(1, ((aPct / 100) * (bPct / 100)) * 100 * boost));
+
+    const bookOdds = match.bookOdds || {};
+
+    const mkItem = (label, pct, realOddKey) => {
+      const hasReal = realOddKey && bookOdds[realOddKey] !== undefined && bookOdds[realOddKey] !== null && bookOdds[realOddKey] !== "";
+      const odd = hasReal ? formatOdd(bookOdds[realOddKey]) : fairOddFromPct(pct);
+      return {
+        label,
+        pct,
+        odd,
+        oddType: hasReal ? "Quota" : "Equa"
+      };
+    };
+
+    return [
+      {
+        title: "Fisse",
+        layout: "grid-3",
+        items: [
+          mkItem("1", p1, "1"),
+          mkItem("X", px, "X"),
+          mkItem("2", p2, "2")
+        ]
+      },
+      {
+        title: "DC",
+        layout: "grid-3",
+        items: [
+          mkItem("1X", p1X),
+          mkItem("X2", pX2),
+          mkItem("12", p12)
+        ]
+      },
+      {
+        title: "Over/Under",
+        layout: "over-under-rows",
+        overItems: [
+          mkItem("Over 1,5", ov15),
+          mkItem("Over 2,5", ov25, "Ov25"),
+          mkItem("Over 3,5", ov35),
+          mkItem("Over 4,5", ov45)
+        ],
+        underItems: [
+          mkItem("Under 1,5", un15),
+          mkItem("Under 2,5", un25, "Un25"),
+          mkItem("Under 3,5", un35),
+          mkItem("Under 4,5", un45)
+        ]
+      },
+      {
+        title: "Goal",
+        layout: "grid-2",
+        items: [
+          mkItem("GG", gg),
+          mkItem("NG", ng)
+        ]
+      },
+      {
+        title: "Multigol Totali",
+        layout: "grid-2",
+        items: [
+          mkItem("1-4", mg14),
+          mkItem("2-5", mg25)
+        ]
+      },
+      {
+        title: "Combo DC+Over",
+        layout: "grid-3",
+        items: [
+          mkItem("1X + Over 1,5", joint(p1X, ov15, 1.08)),
+          mkItem("X2 + Over 1,5", joint(pX2, ov15, 1.08)),
+          mkItem("12 + Over 1,5", joint(p12, ov15, 1.10))
+        ]
+      },
+      {
+        title: "Combo DC+Under",
+        layout: "grid-3",
+        items: [
+          mkItem("1X + Under 4,5", joint(p1X, un45, 1.07)),
+          mkItem("X2 + Under 4,5", joint(pX2, un45, 1.07)),
+          mkItem("12 + Under 4,5", joint(p12, un45, 1.06))
+        ]
+      },
+      {
+        title: "Combo DC+Multigol Totali",
+        layout: "grid-3",
+        items: [
+          mkItem("1X + Multigol 1-4", joint(p1X, mg14, 1.07)),
+          mkItem("1X + Multigol 2-5", joint(p1X, mg25, 1.06)),
+          mkItem("X2 + Multigol 1-4", joint(pX2, mg14, 1.07)),
+          mkItem("X2 + Multigol 2-5", joint(pX2, mg25, 1.06)),
+          mkItem("12 + Multigol 1-4", joint(p12, mg14, 1.07)),
+          mkItem("12 + Multigol 2-5", joint(p12, mg25, 1.06))
+        ]
+      }
+    ];
+  }
+
+  function computeRealFamilies(match, homeHist, awayHist) {
+    const rate = (arr, pred, fallbackPct) => {
+      if (!arr.length) return fallbackPct;
+      const hits = arr.filter(pred).length;
+      return (hits / arr.length) * 100;
+    };
+
+    const hHome = homeHist.filter(x => x.isHome);
+    const aAway = awayHist.filter(x => !x.isHome);
+
+    const hWin = rate(hHome.length ? hHome : homeHist, x => x.outcome === "W", 44);
+    const hDraw = rate(hHome.length ? hHome : homeHist, x => x.outcome === "D", 27);
+    const hLoss = rate(hHome.length ? hHome : homeHist, x => x.outcome === "L", 29);
+
+    const aWin = rate(aAway.length ? aAway : awayHist, x => x.outcome === "W", 30);
+    const aDraw = rate(aAway.length ? aAway : awayHist, x => x.outcome === "D", 28);
+    const aLoss = rate(aAway.length ? aAway : awayHist, x => x.outcome === "L", 42);
+
+    const p1Raw = (hWin + aLoss) / 2;
+    const pxRaw = (hDraw + aDraw) / 2;
+    const p2Raw = (hLoss + aWin) / 2;
+    const sum1X2 = Math.max(1, p1Raw + pxRaw + p2Raw);
+
+    const p1 = (p1Raw / sum1X2) * 100;
+    const px = (pxRaw / sum1X2) * 100;
+    const p2 = (p2Raw / sum1X2) * 100;
+
+    const p1X = Math.min(99, p1 + px);
+    const pX2 = Math.min(99, px + p2);
+    const p12 = Math.min(99, p1 + p2);
+
+    const combined = [...homeHist.slice(-10), ...awayHist.slice(-10)];
+
+    const ov15 = rate(combined, x => x.totalGoals > 1.5, 76);
+    const ov25 = rate(combined, x => x.totalGoals > 2.5, 54);
+    const ov35 = rate(combined, x => x.totalGoals > 3.5, 29);
+    const ov45 = rate(combined, x => x.totalGoals > 4.5, 13);
+
+    const un15 = Math.max(1, 100 - ov15);
+    const un25 = Math.max(1, 100 - ov25);
+    const un35 = Math.max(1, 100 - ov35);
+    const un45 = Math.max(1, 100 - ov45);
+
+    const gg = rate(combined, x => x.btts, 55);
+    const ng = Math.max(1, 100 - gg);
+
+    const mg14 = rate(combined, x => x.totalGoals >= 1 && x.totalGoals <= 4, 78);
+    const mg25 = rate(combined, x => x.totalGoals >= 2 && x.totalGoals <= 5, 68);
+
+    return buildFamiliesFromRates(match, {
+      p1, px, p2,
+      p1X, pX2, p12,
+      ov15, ov25, ov35, ov45,
+      un15, un25, un35, un45,
+      gg, ng,
+      mg14, mg25
+    }, 1.06);
+  }
+
+  function computeDixonColeFamilies(match, leagueCode, resultsRows, homeMetrics, awayMetrics) {
+    const divTarget = String(leagueCode || "").trim().toUpperCase();
+    const leagueRows = (Array.isArray(resultsRows) ? resultsRows : []).filter(r => {
+      const div = String(r.Div || r.DivCode || "").trim().toUpperCase();
+      const hg = Number(r.FTHG);
+      const ag = Number(r.FTAG);
+      return (!divTarget || !div || div === divTarget) && Number.isFinite(hg) && Number.isFinite(ag);
+    });
+
+    let leagueAvgHome = 1.48;
+    let leagueAvgAway = 1.18;
+
+    if (leagueRows.length >= 10) {
+      leagueAvgHome = Math.max(0.6, leagueRows.reduce((s, r) => s + Number(r.FTHG), 0) / leagueRows.length);
+      leagueAvgAway = Math.max(0.5, leagueRows.reduce((s, r) => s + Number(r.FTAG), 0) / leagueRows.length);
+    }
+
+    const homeAtt = Math.max(0.45, Math.min(2.2, homeMetrics.avgScored / Math.max(0.5, (leagueAvgHome + leagueAvgAway) / 2)));
+    const awayDef = Math.max(0.45, Math.min(2.2, awayMetrics.avgConceded / Math.max(0.5, (leagueAvgHome + leagueAvgAway) / 2)));
+
+    const awayAtt = Math.max(0.45, Math.min(2.2, awayMetrics.avgScored / Math.max(0.5, (leagueAvgHome + leagueAvgAway) / 2)));
+    const homeDef = Math.max(0.45, Math.min(2.2, homeMetrics.avgConceded / Math.max(0.5, (leagueAvgHome + leagueAvgAway) / 2)));
+
+    const lambdaHome = Math.max(0.25, Math.min(4.5, leagueAvgHome * homeAtt * awayDef));
+    const lambdaAway = Math.max(0.25, Math.min(4.5, leagueAvgAway * awayAtt * homeDef));
+
+    const maxGoals = 7;
+    const matrix = [];
+    let totalProb = 0;
+
+    for (let h = 0; h <= maxGoals; h++) {
+      matrix[h] = [];
+      for (let a = 0; a <= maxGoals; a++) {
+        const rawP = poissonPmf(h, lambdaHome) * poissonPmf(a, lambdaAway) * dixonColesTau(h, a, lambdaHome, lambdaAway, -0.06);
+        matrix[h][a] = rawP;
+        totalProb += rawP;
+      }
+    }
+
+    let p1 = 0, px = 0, p2 = 0;
+    let ov15 = 0, ov25 = 0, ov35 = 0, ov45 = 0;
+    let gg = 0, mg14 = 0, mg25 = 0;
+
+    const norm = totalProb > 0 ? totalProb : 1;
+
+    for (let h = 0; h <= maxGoals; h++) {
+      for (let a = 0; a <= maxGoals; a++) {
+        const p = (matrix[h][a] / norm) * 100;
+        const tot = h + a;
+
+        if (h > a) p1 += p;
+        else if (h === a) px += p;
+        else p2 += p;
+
+        if (tot > 1.5) ov15 += p;
+        if (tot > 2.5) ov25 += p;
+        if (tot > 3.5) ov35 += p;
+        if (tot > 4.5) ov45 += p;
+
+        if (h > 0 && a > 0) gg += p;
+        if (tot >= 1 && tot <= 4) mg14 += p;
+        if (tot >= 2 && tot <= 5) mg25 += p;
+      }
+    }
+
+    const p1X = Math.min(99, p1 + px);
+    const pX2 = Math.min(99, px + p2);
+    const p12 = Math.min(99, p1 + p2);
+
+    const un15 = Math.max(1, 100 - ov15);
+    const un25 = Math.max(1, 100 - ov25);
+    const un35 = Math.max(1, 100 - ov35);
+    const un45 = Math.max(1, 100 - ov45);
+    const ng = Math.max(1, 100 - gg);
+
+    return {
+      dcXG: Number((lambdaHome + lambdaAway).toFixed(2)),
+      families: buildFamiliesFromRates(match, {
+        p1, px, p2,
+        p1X, pX2, p12,
+        ov15, ov25, ov35, ov45,
+        un15, un25, un35, un45,
+        gg, ng,
+        mg14, mg25
+      }, 1.04)
+    };
   }
 
   function computeLeagueStandings(match, leagueCode, resultsRows, fixturesRows) {
@@ -263,7 +556,6 @@
       }
     }
 
-    // Assicura la presenza anche delle squadre presenti nelle partite future o nella partita corrente
     const extraFixtures = Array.isArray(fixturesRows) ? fixturesRows : [];
     for (const f of extraFixtures) {
       const div = String(f.Div || f.DivCode || "").trim().toUpperCase();
@@ -363,169 +655,6 @@
     `;
   }
 
-  function computeMatchFamilies(match, leagueCode, resultsRows) {
-    const homeHist = collectTeamHistoricalMatches(match.home, leagueCode, resultsRows);
-    const awayHist = collectTeamHistoricalMatches(match.away, leagueCode, resultsRows);
-
-    const homeMetrics = computeTeamMetrics(homeHist, 1.45, 1.05);
-    const awayMetrics = computeTeamMetrics(awayHist, 1.25, 1.25);
-
-    const matchXG = Number(((homeMetrics.xg + awayMetrics.xg) / 1.05).toFixed(2));
-
-    const rate = (arr, pred, fallbackPct) => {
-      if (!arr.length) return fallbackPct;
-      const hits = arr.filter(pred).length;
-      return (hits / arr.length) * 100;
-    };
-
-    const hHome = homeHist.filter(x => x.isHome);
-    const aAway = awayHist.filter(x => !x.isHome);
-
-    const hWin = rate(hHome.length ? hHome : homeHist, x => x.outcome === "W", 44);
-    const hDraw = rate(hHome.length ? hHome : homeHist, x => x.outcome === "D", 27);
-    const hLoss = rate(hHome.length ? hHome : homeHist, x => x.outcome === "L", 29);
-
-    const aWin = rate(aAway.length ? aAway : awayHist, x => x.outcome === "W", 30);
-    const aDraw = rate(aAway.length ? aAway : awayHist, x => x.outcome === "D", 28);
-    const aLoss = rate(aAway.length ? aAway : awayHist, x => x.outcome === "L", 42);
-
-    const p1Raw = (hWin + aLoss) / 2;
-    const pxRaw = (hDraw + aDraw) / 2;
-    const p2Raw = (hLoss + aWin) / 2;
-    const sum1X2 = Math.max(1, p1Raw + pxRaw + p2Raw);
-
-    const p1 = (p1Raw / sum1X2) * 100;
-    const px = (pxRaw / sum1X2) * 100;
-    const p2 = (p2Raw / sum1X2) * 100;
-
-    const p1X = Math.min(99, p1 + px);
-    const pX2 = Math.min(99, px + p2);
-    const p12 = Math.min(99, p1 + p2);
-
-    const combined = [...homeHist.slice(-10), ...awayHist.slice(-10)];
-
-    const ov15 = rate(combined, x => x.totalGoals > 1.5, 76);
-    const ov25 = rate(combined, x => x.totalGoals > 2.5, 54);
-    const ov35 = rate(combined, x => x.totalGoals > 3.5, 29);
-    const ov45 = rate(combined, x => x.totalGoals > 4.5, 13);
-
-    const un15 = Math.max(1, 100 - ov15);
-    const un25 = Math.max(1, 100 - ov25);
-    const un35 = Math.max(1, 100 - ov35);
-    const un45 = Math.max(1, 100 - ov45);
-
-    const gg = rate(combined, x => x.btts, 55);
-    const ng = Math.max(1, 100 - gg);
-
-    const mg14 = rate(combined, x => x.totalGoals >= 1 && x.totalGoals <= 4, 78);
-    const mg25 = rate(combined, x => x.totalGoals >= 2 && x.totalGoals <= 5, 68);
-
-    const joint = (aPct, bPct, boost = 1.06) =>
-      Math.min(98, Math.max(1, ((aPct / 100) * (bPct / 100)) * 100 * boost));
-
-    const bookOdds = match.bookOdds || {};
-
-    const mkItem = (label, pct, realOddKey) => {
-      const hasReal = bookOdds[realOddKey] !== undefined && bookOdds[realOddKey] !== null && bookOdds[realOddKey] !== "";
-      const odd = hasReal ? formatOdd(bookOdds[realOddKey]) : fairOddFromPct(pct);
-      return {
-        label,
-        pct,
-        odd,
-        oddType: hasReal ? "Quota" : "Equa"
-      };
-    };
-
-    return {
-      sampleInfo: `${homeHist.length} gare ${match.home} • ${awayHist.length} gare ${match.away}`,
-      homeMetrics,
-      awayMetrics,
-      matchXG,
-      families: [
-        {
-          title: "Fisse",
-          layout: "grid-3",
-          items: [
-            mkItem("1", p1, "1"),
-            mkItem("X", px, "X"),
-            mkItem("2", p2, "2")
-          ]
-        },
-        {
-          title: "DC",
-          layout: "grid-3",
-          items: [
-            mkItem("1X", p1X),
-            mkItem("X2", pX2),
-            mkItem("12", p12)
-          ]
-        },
-        {
-          title: "Over/Under",
-          layout: "over-under-rows",
-          overItems: [
-            mkItem("Over 1,5", ov15),
-            mkItem("Over 2,5", ov25, "Ov25"),
-            mkItem("Over 3,5", ov35),
-            mkItem("Over 4,5", ov45)
-          ],
-          underItems: [
-            mkItem("Under 1,5", un15),
-            mkItem("Under 2,5", un25, "Un25"),
-            mkItem("Under 3,5", un35),
-            mkItem("Under 4,5", un45)
-          ]
-        },
-        {
-          title: "Goal",
-          layout: "grid-2",
-          items: [
-            mkItem("GG", gg),
-            mkItem("NG", ng)
-          ]
-        },
-        {
-          title: "Multigol Totali",
-          layout: "grid-2",
-          items: [
-            mkItem("1-4", mg14),
-            mkItem("2-5", mg25)
-          ]
-        },
-        {
-          title: "Combo DC+Over",
-          layout: "grid-3",
-          items: [
-            mkItem("1X + Over 1,5", joint(p1X, ov15, 1.08)),
-            mkItem("X2 + Over 1,5", joint(pX2, ov15, 1.08)),
-            mkItem("12 + Over 1,5", joint(p12, ov15, 1.10))
-          ]
-        },
-        {
-          title: "Combo DC+Under",
-          layout: "grid-3",
-          items: [
-            mkItem("1X + Under 4,5", joint(p1X, un45, 1.07)),
-            mkItem("X2 + Under 4,5", joint(pX2, un45, 1.07)),
-            mkItem("12 + Under 4,5", joint(p12, un45, 1.06))
-          ]
-        },
-        {
-          title: "Combo DC+Multigol Totali",
-          layout: "grid-3",
-          items: [
-            mkItem("1X + Multigol 1-4", joint(p1X, mg14, 1.07)),
-            mkItem("1X + Multigol 2-5", joint(p1X, mg25, 1.06)),
-            mkItem("X2 + Multigol 1-4", joint(pX2, mg14, 1.07)),
-            mkItem("X2 + Multigol 2-5", joint(pX2, mg25, 1.06)),
-            mkItem("12 + Multigol 1-4", joint(p12, mg14, 1.07)),
-            mkItem("12 + Multigol 2-5", joint(p12, mg25, 1.06))
-          ]
-        }
-      ]
-    };
-  }
-
   function renderStatChip(item) {
     const isBomb = clampPct(item.pct) >= 90;
     return `
@@ -584,6 +713,69 @@
     `;
   }
 
+  function renderHistoryColumn(teamName, histList, accentClass) {
+    if (!histList.length) {
+      return `
+        <div class="rounded-2xl bg-slate-900/85 border border-slate-800 p-4 space-y-2.5">
+          <div class="border-b border-slate-800 pb-2">
+            <h4 class="text-sm font-extrabold ${accentClass}">${teamName}</h4>
+            <p class="text-[11px] text-slate-400">0 partite in archivio</p>
+          </div>
+          <div class="text-xs text-slate-400 py-4 text-center">Nessuna gara passata disponibile.</div>
+        </div>
+      `;
+    }
+
+    const itemsHtml = [...histList].reverse().map(g => {
+      const rowCls = g.outcome === "W"
+        ? "hist-win text-emerald-100"
+        : g.outcome === "D"
+        ? "hist-draw text-yellow-100"
+        : "hist-loss text-rose-100";
+
+      const badgeCls = g.outcome === "W"
+        ? "bg-emerald-500 text-slate-950"
+        : g.outcome === "D"
+        ? "bg-yellow-400 text-slate-950"
+        : "bg-red-500 text-white";
+
+      const label = g.outcome === "W" ? "V" : g.outcome === "D" ? "P" : "S";
+      const matchLine = g.isHome ? `${g.homeName} - ${g.awayName}` : `${g.homeName} - ${g.awayName}`;
+
+      return `
+        <div class="rounded-xl border px-3 py-2 flex items-center justify-between gap-2 ${rowCls}">
+          <div class="min-w-0">
+            <div class="text-[11px] font-semibold opacity-85">${g.date || "Data N/D"} • ${g.isHome ? "Casa" : "Trasf."}</div>
+            <div class="text-xs font-bold truncate">${matchLine}</div>
+          </div>
+          <div class="flex items-center gap-2 shrink-0">
+            <span class="text-xs font-extrabold px-2 py-0.5 rounded bg-slate-950/60 border border-white/10">
+              ${g.hg} - ${g.ag}
+            </span>
+            <span class="w-6 h-6 rounded-md text-xs font-black inline-flex items-center justify-center ${badgeCls}">
+              ${label}
+            </span>
+          </div>
+        </div>
+      `;
+    }).join("");
+
+    return `
+      <div class="rounded-2xl bg-slate-900/85 border border-slate-800 p-4 space-y-2.5">
+        <div class="flex items-center justify-between border-b border-slate-800 pb-2">
+          <div>
+            <h4 class="text-sm font-extrabold ${accentClass}">${teamName}</h4>
+            <p class="text-[11px] text-slate-400">Storico giornate passate</p>
+          </div>
+          <span class="text-[11px] font-bold text-slate-300">${histList.length} gare</span>
+        </div>
+        <div class="space-y-2 max-h-[560px] overflow-y-auto pr-1">
+          ${itemsHtml}
+        </div>
+      </div>
+    `;
+  }
+
   function ensureOverlayElement() {
     ensureColorStyles();
     let el = document.getElementById(OVERLAY_ID);
@@ -620,6 +812,22 @@
     return el;
   }
 
+  window.switchMatchStatsTab = function (tabId) {
+    const panels = document.querySelectorAll("[data-cg-tab-panel]");
+    const tabs = document.querySelectorAll("[data-cg-tab-btn]");
+
+    panels.forEach(p => {
+      p.classList.toggle("hidden", p.getAttribute("data-cg-tab-panel") !== tabId);
+    });
+
+    tabs.forEach(btn => {
+      const active = btn.getAttribute("data-cg-tab-btn") === tabId;
+      btn.className = active
+        ? "px-3.5 py-2 rounded-xl text-xs sm:text-sm font-extrabold bg-emerald-500/20 text-emerald-300 border border-emerald-400/60 transition cursor-pointer"
+        : "px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold bg-slate-900/90 text-slate-300 border border-slate-800 hover:border-slate-600 transition cursor-pointer";
+    });
+  };
+
   window.openMatchStatsScreen = function (options) {
     const { match, roundNumber, roundLabel, leagueCode, leagueName, countryName, flagHtml, resultsRows, fixturesRows } = options || {};
     if (!match) return;
@@ -636,15 +844,23 @@
     const awayFormVal = match.awayForm ?? 0;
     const diffFormVal = match.diffForm ?? Math.abs((match.homeForm || 0) - (match.awayForm || 0));
 
-    const computed = computeMatchFamilies(match, leagueCode, resultsRows);
+    const homeHist = collectTeamHistoricalMatches(match.home, leagueCode, resultsRows);
+    const awayHist = collectTeamHistoricalMatches(match.away, leagueCode, resultsRows);
+    const hm = computeTeamMetrics(homeHist, 1.45, 1.05);
+    const am = computeTeamMetrics(awayHist, 1.25, 1.25);
+    const matchXG = Number(((hm.xg + am.xg) / 1.05).toFixed(2));
+
+    const realFamilies = computeRealFamilies(match, homeHist, awayHist);
+    const dcData = computeDixonColeFamilies(match, leagueCode, resultsRows, hm, am);
     const standings = computeLeagueStandings(match, leagueCode, resultsRows, fixturesRows);
-    const hm = computed.homeMetrics;
-    const am = computed.awayMetrics;
+
+    const sampleInfo = `${homeHist.length} gare ${match.home} • ${awayHist.length} gare ${match.away}`;
 
     content.innerHTML = `
       <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-        <!-- Colonna Sinistra: Statistiche Partita & Famiglie di Giocata -->
+        <!-- Colonna Sinistra: Partita + 3 Tab -->
         <div class="lg:col-span-7 space-y-5">
+          <!-- Header Partita -->
           <div class="rounded-2xl bg-gradient-to-br from-slate-900 via-slate-900 to-emerald-950/30 border border-slate-700/70 p-5 sm:p-6 shadow-2xl">
             <div class="flex flex-wrap items-center justify-between gap-2 text-xs text-slate-300 mb-4">
               <div class="flex items-center gap-2 font-semibold">
@@ -695,9 +911,9 @@
                 </div>
                 <div class="rounded-xl bg-slate-950/70 border border-slate-800 px-3 py-2 inline-block">
                   <div class="text-[10px] uppercase tracking-wider text-slate-400">xG Partita Stimato</div>
-                  <div class="text-sm font-extrabold text-amber-300">${computed.matchXG.toFixed(2)}</div>
+                  <div class="text-sm font-extrabold text-amber-300">${matchXG.toFixed(2)}</div>
                 </div>
-                <div class="text-[11px] text-slate-500">${computed.sampleInfo}</div>
+                <div class="text-[11px] text-slate-500">${sampleInfo}</div>
               </div>
 
               <!-- Squadra Trasferta -->
@@ -723,8 +939,39 @@
             </div>
           </div>
 
-          <div class="space-y-5">
-            ${computed.families.map(renderFamilySection).join("")}
+          <!-- Barra 3 Tab -->
+          <div class="flex flex-wrap items-center gap-2">
+            <button type="button" data-cg-tab-btn="reali" onclick="switchMatchStatsTab('reali')" class="px-3.5 py-2 rounded-xl text-xs sm:text-sm font-extrabold bg-emerald-500/20 text-emerald-300 border border-emerald-400/60 transition cursor-pointer">
+              📊 Statistiche Reali
+            </button>
+            <button type="button" data-cg-tab-btn="dixon" onclick="switchMatchStatsTab('dixon')" class="px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold bg-slate-900/90 text-slate-300 border border-slate-800 hover:border-slate-600 transition cursor-pointer">
+              🧮 Dixon-Cole
+            </button>
+            <button type="button" data-cg-tab-btn="storico" onclick="switchMatchStatsTab('storico')" class="px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold bg-slate-900/90 text-slate-300 border border-slate-800 hover:border-slate-600 transition cursor-pointer">
+              🕒 Storico Partite
+            </button>
+          </div>
+
+          <!-- Tab 1: Statistiche Reali -->
+          <div data-cg-tab-panel="reali" class="space-y-5">
+            ${realFamilies.map(renderFamilySection).join("")}
+          </div>
+
+          <!-- Tab 2: Dixon-Cole -->
+          <div data-cg-tab-panel="dixon" class="hidden space-y-5">
+            <div class="rounded-xl bg-slate-900/80 border border-slate-800 px-4 py-3 flex items-center justify-between text-xs text-slate-300">
+              <span>Modello Poisson + correzione Dixon-Coles (score bassi)</span>
+              <span class="font-extrabold text-amber-300">xG Modello: ${dcData.dcXG.toFixed(2)}</span>
+            </div>
+            ${dcData.families.map(renderFamilySection).join("")}
+          </div>
+
+          <!-- Tab 3: Storico Partite diviso in 2 colonne -->
+          <div data-cg-tab-panel="storico" class="hidden">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              ${renderHistoryColumn(match.home, homeHist, "text-emerald-300")}
+              ${renderHistoryColumn(match.away, awayHist, "text-sky-300")}
+            </div>
           </div>
         </div>
 
