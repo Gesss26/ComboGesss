@@ -74,11 +74,12 @@ def build_countries_catalog() -> list[dict]:
 
 
 def export_countries_catalog(out_dir: str) -> list[dict]:
+    """Salva data/countries_leagues.json nella cartella data."""
     catalog = build_countries_catalog()
     out_path = os.path.join(out_dir, "countries_leagues.json")
     with open(out_path, "w", encoding="utf-8") as f:
         json.dump(catalog, f, ensure_ascii=False, indent=2)
-    print(f"[OK] Esportato catalogo nazioni/campionati: {out_path}")
+    print(f"[OK] Creato catalogo nazioni/campionati: {out_path}")
     return catalog
 
 
@@ -91,7 +92,7 @@ def download_file(url: str, dest_path: str) -> bool:
         print(f"[OK] Scaricato: {url} -> {dest_path}")
         return True
     except Exception as exc:
-        print(f"[ERRORE] Impossibile scaricare {url}: {exc}")
+        print(f"[AVVISO] Impossibile scaricare {url}: {exc}")
         return False
 
 
@@ -112,11 +113,11 @@ def download_fixtures_excel(dest_path: str) -> None:
                 if download_file(target_url, dest_path):
                     return
     except Exception as exc:
-        print(f"[ERRORE] Fallback matches.php fallito: {exc}")
+        print(f"[AVVISO] Fallback matches.php non riuscito: {exc}")
 
 
 def sync_euro_excel(out_dir: str) -> None:
-    """Scarica o legge all-euro-data-2026-2027.xlsx e rileva eventuali codici/fogli extra."""
+    """Scarica o ispeziona all-euro-data-2026-2027.xlsx dentro data/."""
     local_excel = os.path.join(out_dir, EURO_EXCEL_NAME)
     if not os.path.exists(local_excel):
         candidate_url = urljoin(BASE_URL, f"mmz4281/{SEASON}/{EURO_EXCEL_NAME}")
@@ -135,7 +136,7 @@ def sync_euro_excel(out_dir: str) -> None:
 
 
 def download_leagues_data(season: str, out_dir: str) -> None:
-    """Scarica i CSV di tutti i campionati configurati e crea un file combinato."""
+    """Scarica i CSV di tutti i campionati configurati e crea data/all_leagues.csv."""
     all_frames = []
     for code, (country, flag, league_name) in LEAGUES.items():
         url = f"{BASE_URL}mmz4281/{season}/{code}.csv"
