@@ -1,817 +1,473 @@
-<!DOCTYPE html>
-<html lang="it">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>ComboGesss — Statistiche Calcio Top 5 & Serie Minori</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-  <style>
-    body {
-      background-color: #0b0f17;
-      color: #f1f5f9;
-      font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-    }
-    .glass-card {
-      background: linear-gradient(180deg, rgba(20, 27, 41, 0.92) 0%, rgba(15, 21, 33, 0.96) 100%);
-      border: 1px solid rgba(148, 163, 184, 0.14);
-    }
-    .form-pill {
-      width: 22px;
-      height: 22px;
-      border-radius: 6px;
-      font-size: 11px;
-      font-weight: 800;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-    }
-    .form-W {
-      background: rgba(16, 185, 129, 0.22);
-      color: #6ee7b7;
-      border: 1px solid rgba(16, 185, 129, 0.45);
-    }
-    .form-D {
-      background: rgba(245, 158, 11, 0.2);
-      color: #fcd34d;
-      border: 1px solid rgba(245, 158, 11, 0.45);
-    }
-    .form-L {
-      background: rgba(239, 68, 68, 0.2);
-      color: #fca5a5;
-      border: 1px solid rgba(239, 68, 68, 0.45);
-    }
+(function () {
+  const OVERLAY_ID = "combogesssMatchStatsOverlay";
+  const STYLE_ID = "combogesssPctColorStyles";
 
-    /* Colorazione percentuali */
-    .pct-red {
-      color: #f87171 !important;
-    }
-    .pct-white {
-      color: #f8fafc !important;
-    }
-    .pct-green {
-      color: #34d399 !important;
-    }
-    .pct-gold {
-      color: #facc15 !important;
-    }
-
-    @keyframes cgGoldPulse {
-      0%, 100% {
-        box-shadow: 0 0 0 0 rgba(250, 204, 21, 0.45), 0 0 14px rgba(250, 204, 21, 0.28);
-        transform: scale(1);
+  function ensureColorStyles() {
+    if (document.getElementById(STYLE_ID)) return;
+    const style = document.createElement("style");
+    style.id = STYLE_ID;
+    style.textContent = `
+      .pct-red {
+        color: #f87171 !important;
       }
-      50% {
-        box-shadow: 0 0 0 5px rgba(250, 204, 21, 0.12), 0 0 22px rgba(250, 204, 21, 0.55);
-        transform: scale(1.02);
+      .pct-white {
+        color: #f8fafc !important;
       }
-    }
-
-    @keyframes cgBombBounce {
-      0%, 100% {
-        transform: translateY(0) rotate(-6deg) scale(1);
+      .pct-green {
+        color: #34d399 !important;
       }
-      50% {
-        transform: translateY(-2px) rotate(8deg) scale(1.14);
+      .pct-gold {
+        color: #facc15 !important;
       }
-    }
-
-    .flag-bomb {
-      color: #facc15 !important;
-      border-color: rgba(250, 204, 21, 0.75) !important;
-      background: linear-gradient(135deg, rgba(250, 204, 21, 0.22), rgba(245, 158, 11, 0.12)) !important;
-      animation: cgGoldPulse 1.6s infinite ease-in-out;
-    }
-
-    .flag-bomb .bomb-icon {
-      display: inline-block;
-      animation: cgBombBounce 1.1s infinite ease-in-out;
-    }
-
-    ::-webkit-scrollbar { width: 8px; height: 8px; }
-    ::-webkit-scrollbar-track { background: #0b0f17; }
-    ::-webkit-scrollbar-thumb { background: #263248; border-radius: 999px; }
-  </style>
-</head>
-<body class="min-h-screen flex flex-col">
-
-  <!-- Header -->
-  <header class="border-b border-slate-800 bg-slate-950/90 backdrop-blur sticky top-0 z-30">
-    <div class="max-w-7xl mx-auto px-4 py-3 flex flex-wrap items-center justify-between gap-3">
-      <div class="flex items-center gap-3">
-        <div class="w-10 h-10 rounded-xl bg-emerald-500/15 border border-emerald-400/30 flex items-center justify-center text-2xl">
-          ⚽
-        </div>
-        <div>
-          <div class="flex items-center gap-2">
-            <h1 class="text-xl font-extrabold tracking-tight text-white">ComboGesss</h1>
-            <span class="text-[11px] uppercase tracking-wider px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
-              Top 5 + Serie B
-            </span>
-          </div>
-          <p id="dataStatusText" class="text-xs text-slate-400">Inizializzazione dati in corso...</p>
-        </div>
-      </div>
-
-      <div class="flex items-center gap-2">
-        <button id="reloadDataBtn" onclick="autoLoadComboGesssData(true)" class="px-3 py-2 rounded-lg text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition">
-          🔄 Aggiorna Dati
-        </button>
-        <label class="px-3 py-2 rounded-lg text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 text-white cursor-pointer transition">
-          📥 Carica Excel/CSV
-          <input id="manualFileInput" type="file" accept=".xlsx,.xls,.csv" multiple class="hidden" onchange="handleManualUpload(event)" />
-        </label>
-      </div>
-    </div>
-  </header>
-
-  <!-- Main Content -->
-  <main class="max-w-7xl w-full mx-auto px-4 py-6 flex-1 grid grid-cols-1 lg:grid-cols-12 gap-6">
-
-    <!-- Colonna 1: Nazioni con bandiere -->
-    <section class="lg:col-span-3 space-y-3">
-      <div class="flex items-center justify-between">
-        <h2 class="text-xs font-bold uppercase tracking-wider text-slate-400">1. Nazioni</h2>
-        <span class="text-[11px] text-slate-500">Seleziona paese</span>
-      </div>
-      <div id="countriesList" class="space-y-2"></div>
-    </section>
-
-    <!-- Colonna 2: Lega A / Lega B della nazione selezionata -->
-    <section class="lg:col-span-3 space-y-3">
-      <div class="flex items-center justify-between">
-        <h2 class="text-xs font-bold uppercase tracking-wider text-slate-400">2. Campionati</h2>
-        <div id="selectedCountryBadge" class="flex items-center gap-1.5 text-xs text-emerald-400 font-semibold"></div>
-      </div>
-      <div id="leaguesList" class="space-y-2.5"></div>
-    </section>
-
-    <!-- Colonna 3: Giornata completa -->
-    <section class="lg:col-span-6 space-y-4">
-      <div class="glass-card rounded-2xl p-4">
-        <div class="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <div id="currentLeagueTitle" class="flex items-center gap-2 text-lg font-bold text-white"></div>
-            <p id="currentLeagueSubtitle" class="text-xs text-slate-400 mt-0.5">Intera giornata ordinata per differenza di forma</p>
-          </div>
-          <div class="flex items-center gap-2">
-            <button onclick="changeRound(-1)" class="px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs font-bold text-slate-200 border border-slate-700">◀</button>
-            <select id="roundSelect" onchange="selectRound(this.value)" class="px-3 py-1.5 rounded-lg bg-slate-900 text-xs font-semibold text-white border border-slate-700 focus:outline-none focus:border-emerald-500"></select>
-            <button onclick="changeRound(1)" class="px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs font-bold text-slate-200 border border-slate-700">▶</button>
-          </div>
-        </div>
-      </div>
-
-      <div id="matchesList" class="space-y-2.5"></div>
-    </section>
-  </main>
-
-  <script>
-    const NATIONS = [
-      {
-        id: "Italia",
-        name: "Italia",
-        flagUrl: "https://flagcdn.com/w40/it.png",
-        emojiFlag: "🇮🇹",
-        leagues: [
-          { code: "I1", tier: "Lega A", name: "Serie A", matchesPerRound: 10 },
-          { code: "I2", tier: "Lega B", name: "Serie B", matchesPerRound: 10 }
-        ]
-      },
-      {
-        id: "Inghilterra",
-        name: "Inghilterra",
-        flagUrl: "https://flagcdn.com/w40/gb-eng.png",
-        emojiFlag: "🏴󠁧󠁢󠁥󠁮󠁧󠁿",
-        leagues: [
-          { code: "E0", tier: "Lega A", name: "Premier League", matchesPerRound: 10 },
-          { code: "E1", tier: "Lega B", name: "Championship", matchesPerRound: 12 }
-        ]
-      },
-      {
-        id: "Spagna",
-        name: "Spagna",
-        flagUrl: "https://flagcdn.com/w40/es.png",
-        emojiFlag: "🇪🇸",
-        leagues: [
-          { code: "SP1", tier: "Lega A", name: "La Liga", matchesPerRound: 10 },
-          { code: "SP2", tier: "Lega B", name: "Segunda Division", matchesPerRound: 11 }
-        ]
-      },
-      {
-        id: "Germania",
-        name: "Germania",
-        flagUrl: "https://flagcdn.com/w40/de.png",
-        emojiFlag: "🇩🇪",
-        leagues: [
-          { code: "D1", tier: "Lega A", name: "Bundesliga", matchesPerRound: 9 },
-          { code: "D2", tier: "Lega B", name: "2. Bundesliga", matchesPerRound: 9 }
-        ]
-      },
-      {
-        id: "Francia",
-        name: "Francia",
-        flagUrl: "https://flagcdn.com/w40/fr.png",
-        emojiFlag: "🇫🇷",
-        leagues: [
-          { code: "F1", tier: "Lega A", name: "Ligue 1", matchesPerRound: 9 },
-          { code: "F2", tier: "Lega B", name: "Ligue 2", matchesPerRound: 9 }
-        ]
+      @keyframes cgGoldPulse {
+        0%, 100% {
+          box-shadow: 0 0 0 0 rgba(250, 204, 21, 0.45), 0 0 14px rgba(250, 204, 21, 0.28);
+          transform: scale(1);
+        }
+        50% {
+          box-shadow: 0 0 0 5px rgba(250, 204, 21, 0.12), 0 0 22px rgba(250, 204, 21, 0.55);
+          transform: scale(1.02);
+        }
       }
-    ];
+      @keyframes cgBombBounce {
+        0%, 100% {
+          transform: translateY(0) rotate(-6deg) scale(1);
+        }
+        50% {
+          transform: translateY(-2px) rotate(8deg) scale(1.14);
+        }
+      }
+      .flag-bomb {
+        color: #facc15 !important;
+        border-color: rgba(250, 204, 21, 0.75) !important;
+        background: linear-gradient(135deg, rgba(250, 204, 21, 0.22), rgba(245, 158, 11, 0.12)) !important;
+        animation: cgGoldPulse 1.6s infinite ease-in-out;
+      }
+      .flag-bomb .bomb-icon {
+        display: inline-block;
+        animation: cgBombBounce 1.1s infinite ease-in-out;
+      }
+    `;
+    document.head.appendChild(style);
+  }
 
-    const state = {
-      selectedCountry: "Italia",
-      selectedLeagueCode: "I1",
-      selectedRound: 1,
-      resultsRows: [],
-      fixturesRows: [],
-      roundsByLeague: {}
+  function clampPct(val) {
+    const n = Number(val);
+    if (!Number.isFinite(n)) return 0;
+    return Math.max(0, Math.min(100, n));
+  }
+
+  function toPct(val) {
+    const num = clampPct(val);
+    const fixed = num.toFixed(1);
+    return `${fixed.endsWith(".0") ? fixed.slice(0, -2) : fixed.replace(".", ",")}%`;
+  }
+
+  function getPctColorClass(val) {
+    const p = clampPct(val);
+    if (p >= 90) return "pct-gold";
+    if (p >= 66.67) return "pct-green";
+    if (p >= 33.34) return "pct-white";
+    return "pct-red";
+  }
+
+  function renderPctBadge(val, extraClasses = "") {
+    const p = clampPct(val);
+    const isBomb = p >= 90;
+    const colorClass = getPctColorClass(p);
+    const bombClass = isBomb ? "flag-bomb" : "";
+    return `
+      <span class="inline-flex items-center gap-1 font-extrabold ${colorClass} ${bombClass} ${extraClasses}">
+        ${isBomb ? `<span class="bomb-icon" aria-hidden="true">💣</span>` : ""}
+        <span>${toPct(p)}</span>
+      </span>
+    `;
+  }
+
+  function formatMatchDate(val) {
+    if (val === null || val === undefined || val === "") return "Data N/D";
+    if (typeof val === "number" && Number.isFinite(val)) {
+      const serialDays = Math.floor(val);
+      const utcMs = Date.UTC(1899, 11, 30) + serialDays * 86400000;
+      const d = new Date(utcMs);
+      return `${String(d.getUTCDate()).padStart(2, "0")}/${String(d.getUTCMonth() + 1).padStart(2, "0")}/${d.getUTCFullYear()}`;
+    }
+    const str = String(val).trim();
+    if (/^\d+(\.\d+)?$/.test(str)) return formatMatchDate(parseFloat(str));
+    return str;
+  }
+
+  function formatMatchTime(val) {
+    if (val === null || val === undefined || val === "") return "";
+    if (typeof val === "number" && Number.isFinite(val)) {
+      const dayFraction = val % 1;
+      const totalMinutes = Math.round(dayFraction * 24 * 60) % (24 * 60);
+      const hh = String(Math.floor(totalMinutes / 60)).padStart(2, "0");
+      const mm = String(totalMinutes % 60).padStart(2, "0");
+      return `${hh}:${mm}`;
+    }
+    const str = String(val).trim();
+    if (/^\d+(\.\d+)?$/.test(str)) return formatMatchTime(parseFloat(str));
+    return str.slice(0, 5);
+  }
+
+  function renderFormPills(arr) {
+    return (arr || []).slice(-5).map(res => {
+      const label = res === "W" ? "V" : res === "D" ? "P" : "S";
+      const cls = res === "W"
+        ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/40"
+        : res === "D"
+        ? "bg-amber-500/20 text-amber-300 border-amber-500/40"
+        : "bg-rose-500/20 text-rose-300 border-rose-500/40";
+      return `<span class="inline-flex items-center justify-center w-6 h-6 rounded-md text-xs font-extrabold border ${cls}">${label}</span>`;
+    }).join("");
+  }
+
+  function collectTeamHistoricalMatches(teamName, leagueCode, resultsRows) {
+    const target = String(teamName || "").trim().toLowerCase();
+    const divTarget = String(leagueCode || "").trim().toUpperCase();
+    const rows = Array.isArray(resultsRows) ? resultsRows : [];
+
+    return rows
+      .filter(r => {
+        const div = String(r.Div || r.DivCode || "").trim().toUpperCase();
+        if (divTarget && div && div !== divTarget) return false;
+        const h = String(r.HomeTeam || r.Home || "").trim().toLowerCase();
+        const a = String(r.AwayTeam || r.Away || "").trim().toLowerCase();
+        const hg = Number(r.FTHG);
+        const ag = Number(r.FTAG);
+        return (h === target || a === target) && Number.isFinite(hg) && Number.isFinite(ag);
+      })
+      .map(r => {
+        const h = String(r.HomeTeam || r.Home || "").trim().toLowerCase();
+        const isHome = h === target;
+        const hg = Number(r.FTHG);
+        const ag = Number(r.FTAG);
+        const totalGoals = hg + ag;
+        const ftr = String(r.FTR || "").trim().toUpperCase() || (hg > ag ? "H" : hg < ag ? "A" : "D");
+        const outcome = ftr === "D" ? "D" : ((isHome && ftr === "H") || (!isHome && ftr === "A") ? "W" : "L");
+
+        return {
+          isHome,
+          totalGoals,
+          btts: hg > 0 && ag > 0,
+          outcome
+        };
+      });
+  }
+
+  function computeMatchFamilies(match, leagueCode, resultsRows) {
+    const homeHist = collectTeamHistoricalMatches(match.home, leagueCode, resultsRows);
+    const awayHist = collectTeamHistoricalMatches(match.away, leagueCode, resultsRows);
+
+    const rate = (arr, pred, fallbackPct) => {
+      if (!arr.length) return fallbackPct;
+      const hits = arr.filter(pred).length;
+      return (hits / arr.length) * 100;
     };
 
-    function clampPct(val) {
-      const n = Number(val);
-      if (!Number.isFinite(n)) return 0;
-      return Math.max(0, Math.min(100, n));
-    }
+    const hHome = homeHist.filter(x => x.isHome);
+    const aAway = awayHist.filter(x => !x.isHome);
 
-    function formatPct(num) {
-      const fixed = clampPct(num).toFixed(1);
-      return `${fixed.endsWith(".0") ? fixed.slice(0, -2) : fixed.replace(".", ",")}%`;
-    }
+    const hWin = rate(hHome.length ? hHome : homeHist, x => x.outcome === "W", 44);
+    const hDraw = rate(hHome.length ? hHome : homeHist, x => x.outcome === "D", 27);
+    const hLoss = rate(hHome.length ? hHome : homeHist, x => x.outcome === "L", 29);
 
-    function getPctColorClass(val) {
-      const p = clampPct(val);
-      if (p >= 90) return "pct-gold";
-      if (p >= 66.67) return "pct-green";
-      if (p >= 33.34) return "pct-white";
-      return "pct-red";
-    }
+    const aWin = rate(aAway.length ? aAway : awayHist, x => x.outcome === "W", 30);
+    const aDraw = rate(aAway.length ? aAway : awayHist, x => x.outcome === "D", 28);
+    const aLoss = rate(aAway.length ? aAway : awayHist, x => x.outcome === "L", 42);
 
-    function renderPctText(val, extraClasses = "") {
-      const p = clampPct(val);
-      const isBomb = p >= 90;
-      const colorClass = getPctColorClass(p);
-      const bombClass = isBomb ? "flag-bomb" : "";
-      return `
-        <span class="inline-flex items-center gap-1 font-extrabold ${colorClass} ${bombClass} ${extraClasses}">
-          ${isBomb ? `<span class="bomb-icon" aria-hidden="true">💣</span>` : ""}
-          <span>${formatPct(p)}</span>
-        </span>
-      `;
-    }
+    const p1Raw = (hWin + aLoss) / 2;
+    const pxRaw = (hDraw + aDraw) / 2;
+    const p2Raw = (hLoss + aWin) / 2;
+    const sum1X2 = Math.max(1, p1Raw + pxRaw + p2Raw);
 
-    function renderFlagBadge(nationObj, sizeClass = "w-6 h-4") {
-      if (!nationObj) return `<span class="text-base">⚽</span>`;
-      return `
-        <span class="inline-flex items-center shrink-0">
-          <img
-            src="${nationObj.flagUrl}"
-            alt="${nationObj.name}"
-            title="${nationObj.name}"
-            onerror="this.style.display='none'; this.nextElementSibling.style.display='inline';"
-            class="${sizeClass} object-cover rounded-sm border border-white/15"
-          />
-          <span class="text-base hidden">${nationObj.emojiFlag}</span>
-        </span>
-      `;
-    }
+    const p1 = (p1Raw / sum1X2) * 100;
+    const px = (pxRaw / sum1X2) * 100;
+    const p2 = (p2Raw / sum1X2) * 100;
 
-    function formatExcelDate(val) {
-      if (val === null || val === undefined || val === "") return "";
-      if (typeof val === "number" && Number.isFinite(val)) {
-        const serialDays = Math.floor(val);
-        const utcMs = Date.UTC(1899, 11, 30) + serialDays * 86400000;
-        const d = new Date(utcMs);
-        const dd = String(d.getUTCDate()).padStart(2, "0");
-        const mm = String(d.getUTCMonth() + 1).padStart(2, "0");
-        const yyyy = d.getUTCFullYear();
-        return `${dd}/${mm}/${yyyy}`;
-      }
-      const str = String(val).trim();
-      if (/^\d+(\.\d+)?$/.test(str)) {
-        return formatExcelDate(parseFloat(str));
-      }
-      return str;
-    }
+    const p1X = Math.min(99, p1 + px);
+    const pX2 = Math.min(99, px + p2);
+    const p12 = Math.min(99, p1 + p2);
 
-    function formatExcelTime(val) {
-      if (val === null || val === undefined || val === "") return "";
-      if (typeof val === "number" && Number.isFinite(val)) {
-        const dayFraction = val % 1;
-        const totalMinutes = Math.round(dayFraction * 24 * 60) % (24 * 60);
-        const hh = String(Math.floor(totalMinutes / 60)).padStart(2, "0");
-        const mm = String(totalMinutes % 60).padStart(2, "0");
-        return `${hh}:${mm}`;
-      }
-      const str = String(val).trim();
-      if (/^\d+(\.\d+)?$/.test(str)) {
-        return formatExcelTime(parseFloat(str));
-      }
-      return str.slice(0, 5);
-    }
+    const combined = [...homeHist.slice(-10), ...awayHist.slice(-10)];
 
-    function computeFormScore(resultsArr) {
-      const last5 = (resultsArr || []).slice(-5);
-      let score = 0;
-      for (const r of last5) {
-        if (r === "W") score += 20;
-        else if (r === "D") score += 7.5;
-      }
-      return Number(score.toFixed(1));
-    }
+    const ov15 = rate(combined, x => x.totalGoals > 1.5, 76);
+    const ov25 = rate(combined, x => x.totalGoals > 2.5, 54);
+    const ov35 = rate(combined, x => x.totalGoals > 3.5, 29);
+    const ov45 = rate(combined, x => x.totalGoals > 4.5, 13);
 
-    function getLeagueMeta(code) {
-      for (const n of NATIONS) {
-        const found = n.leagues.find(l => l.code === code);
-        if (found) {
-          return {
-            ...found,
-            nation: n,
-            country: n.name,
-            flagUrl: n.flagUrl,
-            emojiFlag: n.emojiFlag
-          };
+    const un15 = Math.max(1, 100 - ov15);
+    const un25 = Math.max(1, 100 - ov25);
+    const un35 = Math.max(1, 100 - ov35);
+    const un45 = Math.max(1, 100 - ov45);
+
+    const gg = rate(combined, x => x.btts, 55);
+    const ng = Math.max(1, 100 - gg);
+
+    const mg14 = rate(combined, x => x.totalGoals >= 1 && x.totalGoals <= 4, 78);
+    const mg25 = rate(combined, x => x.totalGoals >= 2 && x.totalGoals <= 5, 68);
+
+    const joint = (aPct, bPct, boost = 1.06) =>
+      Math.min(98, Math.max(1, ((aPct / 100) * (bPct / 100)) * 100 * boost));
+
+    return {
+      sampleInfo: `${homeHist.length} gare ${match.home} • ${awayHist.length} gare ${match.away}`,
+      families: [
+        {
+          title: "Fisse",
+          layout: "grid-3",
+          items: [
+            { label: "1", pct: p1 },
+            { label: "X", pct: px },
+            { label: "2", pct: p2 }
+          ]
+        },
+        {
+          title: "DC",
+          layout: "grid-3",
+          items: [
+            { label: "1X", pct: p1X },
+            { label: "X2", pct: pX2 },
+            { label: "12", pct: p12 }
+          ]
+        },
+        {
+          title: "Over/Under",
+          layout: "over-under-rows",
+          overItems: [
+            { label: "Over 1,5", pct: ov15 },
+            { label: "Over 2,5", pct: ov25 },
+            { label: "Over 3,5", pct: ov35 },
+            { label: "Over 4,5", pct: ov45 }
+          ],
+          underItems: [
+            { label: "Under 1,5", pct: un15 },
+            { label: "Under 2,5", pct: un25 },
+            { label: "Under 3,5", pct: un35 },
+            { label: "Under 4,5", pct: un45 }
+          ]
+        },
+        {
+          title: "Goal",
+          layout: "grid-2",
+          items: [
+            { label: "GG", pct: gg },
+            { label: "NG", pct: ng }
+          ]
+        },
+        {
+          title: "Multigol Totali",
+          layout: "grid-2",
+          items: [
+            { label: "1-4", pct: mg14 },
+            { label: "2-5", pct: mg25 }
+          ]
+        },
+        {
+          title: "Combo DC+Over",
+          layout: "grid-3",
+          items: [
+            { label: "1X + Over 1,5", pct: joint(p1X, ov15, 1.08) },
+            { label: "X2 + Over 1,5", pct: joint(pX2, ov15, 1.08) },
+            { label: "12 + Over 1,5", pct: joint(p12, ov15, 1.10) }
+          ]
+        },
+        {
+          title: "Combo DC+Under",
+          layout: "grid-3",
+          items: [
+            { label: "1X + Under 4,5", pct: joint(p1X, un45, 1.07) },
+            { label: "X2 + Under 4,5", pct: joint(pX2, un45, 1.07) },
+            { label: "12 + Under 4,5", pct: joint(p12, un45, 1.06) }
+          ]
+        },
+        {
+          title: "Combo DC+Multigol Totali",
+          layout: "grid-3",
+          items: [
+            { label: "1X + Multigol 1-4", pct: joint(p1X, mg14, 1.07) },
+            { label: "1X + Multigol 2-5", pct: joint(p1X, mg25, 1.06) },
+            { label: "X2 + Multigol 1-4", pct: joint(pX2, mg14, 1.07) },
+            { label: "X2 + Multigol 2-5", pct: joint(pX2, mg25, 1.06) },
+            { label: "12 + Multigol 1-4", pct: joint(p12, mg14, 1.07) },
+            { label: "12 + Multigol 2-5", pct: joint(p12, mg25, 1.06) }
+          ]
         }
-      }
-      return {
-        code,
-        tier: "Lega A",
-        name: code,
-        matchesPerRound: 10,
-        nation: NATIONS[0],
-        country: "Italia",
-        flagUrl: NATIONS[0].flagUrl,
-        emojiFlag: "🇮🇹"
-      };
-    }
+      ]
+    };
+  }
 
-    function buildDemoRounds() {
-      const demoTeams = {
-        I1: ["Inter", "Milan", "Juventus", "Napoli", "Atalanta", "Lazio", "Roma", "Fiorentina", "Bologna", "Torino", "Como", "Udinese", "Genoa", "Cagliari", "Parma", "Verona", "Empoli", "Lecce", "Monza", "Venezia"],
-        I2: ["Palermo", "Sampdoria", "Cremonese", "Bari", "Spezia", "Frosinone", "Salernitana", "Modena", "Pisa", "Cesena", "Brescia", "Catanzaro", "Sudtirol", "Reggiana", "Cosenza", "Mantova", "Carrarese", "Juve Stabia", "Cittadella", "Sassuolo"]
-      };
-      const patternPool = [
-        ["W", "W", "D", "W", "L"],
-        ["D", "W", "L", "W", "D"],
-        ["L", "D", "W", "L", "W"],
-        ["W", "L", "L", "D", "W"],
-        ["D", "D", "L", "W", "L"],
-        ["W", "W", "W", "D", "W"]
-      ];
+  function renderStatChip(item) {
+    const isBomb = clampPct(item.pct) >= 90;
+    return `
+      <div class="rounded-xl bg-slate-950/80 border border-slate-800/90 hover:border-emerald-500/40 px-3 py-2.5 flex items-center justify-between gap-2 transition ${isBomb ? "flag-bomb" : ""}">
+        <span class="text-xs font-bold text-slate-200 leading-tight">${item.label}</span>
+        ${renderPctBadge(item.pct, "text-xs sm:text-sm shrink-0")}
+      </div>
+    `;
+  }
 
-      const roundsMap = {};
-      for (const n of NATIONS) {
-        for (const lg of n.leagues) {
-          const teams = demoTeams[lg.code] || Array.from({ length: lg.matchesPerRound * 2 }, (_, i) => `${lg.name} Team ${i + 1}`);
-          const rounds = [];
-          for (let r = 1; r <= 3; r++) {
-            const matches = [];
-            for (let m = 0; m < lg.matchesPerRound; m++) {
-              const home = teams[(m * 2 + (r - 1) * 2) % teams.length];
-              const away = teams[(m * 2 + 1 + (r - 1) * 2) % teams.length];
-              const homeFormArr = patternPool[(m + r) % patternPool.length];
-              const awayFormArr = patternPool[(m + r + 2) % patternPool.length];
-              const homeForm = computeFormScore(homeFormArr);
-              const awayForm = computeFormScore(awayFormArr);
-              const diffForm = Math.abs(homeForm - awayForm);
+  function renderFamilySection(fam) {
+    let bodyHtml = "";
 
-              matches.push({
-                id: `${lg.code}-R${r}-${m}`,
-                home: home === away ? `${home} Utd` : home,
-                away: away === home ? `${away} City` : away,
-                date: "22/11/2026",
-                time: m < 5 ? "15:00" : "18:00",
-                ftResult: r === 1 ? `${(m + 1) % 3} - ${m % 2}` : null,
-                homeFormArr,
-                awayFormArr,
-                homeForm,
-                awayForm,
-                diffForm
-              });
-            }
-            matches.sort((a, b) => b.diffForm - a.diffForm);
-            rounds.push({ roundNumber: r, label: r === 3 ? `Giornata ${r} (Prossima)` : `Giornata ${r}`, matches });
-          }
-          roundsMap[lg.code] = rounds;
-        }
-      }
-      return roundsMap;
-    }
-
-    function organizeMatchesIntoRounds(resultsRows, fixturesRows) {
-      const baseDemo = buildDemoRounds();
-      const groupedByLeague = {};
-      const teamHistoryByDiv = {};
-
-      const cleanResults = (resultsRows || []).map(row => {
-        const div = String(row.Div || row.DivCode || "").trim().toUpperCase();
-        const home = String(row.HomeTeam || row.Home || "").trim();
-        const away = String(row.AwayTeam || row.Away || "").trim();
-        const ftr = String(row.FTR || "").trim().toUpperCase();
-        return {
-          div,
-          home,
-          away,
-          date: formatExcelDate(row.Date),
-          time: formatExcelTime(row.Time),
-          ftResult: (row.FTHG !== undefined && row.FTHG !== "" && row.FTAG !== undefined && row.FTAG !== "")
-            ? `${row.FTHG} - ${row.FTAG}` : null,
-          ftr,
-          isFixture: false
-        };
-      }).filter(x => x.div && x.home && x.away);
-
-      for (const item of cleanResults) {
-        if (!teamHistoryByDiv[item.div]) teamHistoryByDiv[item.div] = {};
-        if (!teamHistoryByDiv[item.div][item.home]) teamHistoryByDiv[item.div][item.home] = [];
-        if (!teamHistoryByDiv[item.div][item.away]) teamHistoryByDiv[item.div][item.away] = [];
-
-        if (item.ftr === "H") {
-          teamHistoryByDiv[item.div][item.home].push("W");
-          teamHistoryByDiv[item.div][item.away].push("L");
-        } else if (item.ftr === "A") {
-          teamHistoryByDiv[item.div][item.home].push("L");
-          teamHistoryByDiv[item.div][item.away].push("W");
-        } else if (item.ftr === "D") {
-          teamHistoryByDiv[item.div][item.home].push("D");
-          teamHistoryByDiv[item.div][item.away].push("D");
-        }
-      }
-
-      const cleanFixtures = (fixturesRows || []).map(row => {
-        const div = String(row.Div || row.DivCode || "").trim().toUpperCase();
-        const home = String(row.HomeTeam || row.Home || "").trim();
-        const away = String(row.AwayTeam || row.Away || "").trim();
-        return {
-          div,
-          home,
-          away,
-          date: formatExcelDate(row.Date),
-          time: formatExcelTime(row.Time),
-          ftResult: null,
-          isFixture: true
-        };
-      }).filter(x => x.div && x.home && x.away);
-
-      const allItems = [...cleanResults, ...cleanFixtures];
-      if (!allItems.length) return baseDemo;
-
-      for (const item of allItems) {
-        if (!groupedByLeague[item.div]) groupedByLeague[item.div] = [];
-        groupedByLeague[item.div].push(item);
-      }
-
-      const fallbackCycle = [["W", "D", "W", "L", "W"], ["D", "W", "L", "D", "W"], ["L", "W", "D", "W", "L"]];
-      const finalRounds = {};
-
-      for (const n of NATIONS) {
-        for (const lg of n.leagues) {
-          const list = groupedByLeague[lg.code] || [];
-          if (!list.length) {
-            finalRounds[lg.code] = baseDemo[lg.code];
-            continue;
-          }
-
-          const size = lg.matchesPerRound || 10;
-          const totalRounds = Math.max(1, Math.ceil(list.length / size));
-          const rounds = [];
-
-          for (let r = 0; r < totalRounds; r++) {
-            const slice = list.slice(r * size, (r + 1) * size).map((m, idx) => {
-              const histMap = teamHistoryByDiv[lg.code] || {};
-              const homeFormArr = (histMap[m.home] && histMap[m.home].length)
-                ? histMap[m.home].slice(-5)
-                : fallbackCycle[(r + idx) % fallbackCycle.length];
-              const awayFormArr = (histMap[m.away] && histMap[m.away].length)
-                ? histMap[m.away].slice(-5)
-                : fallbackCycle[(r + idx + 1) % fallbackCycle.length];
-
-              const homeForm = computeFormScore(homeFormArr);
-              const awayForm = computeFormScore(awayFormArr);
-              const diffForm = Math.abs(homeForm - awayForm);
-
-              return {
-                ...m,
-                id: `${lg.code}-${r + 1}-${idx}`,
-                homeFormArr,
-                awayFormArr,
-                homeForm,
-                awayForm,
-                diffForm
-              };
-            });
-
-            slice.sort((a, b) => b.diffForm - a.diffForm);
-
-            const roundNum = r + 1;
-            const isLast = roundNum === totalRounds;
-            rounds.push({
-              roundNumber: roundNum,
-              label: isLast ? `Giornata ${roundNum} (Prossime)` : `Giornata ${roundNum}`,
-              matches: slice
-            });
-          }
-          finalRounds[lg.code] = rounds;
-        }
-      }
-
-      return finalRounds;
-    }
-
-    async function autoLoadComboGesssData(forceReload = false) {
-      const statusEl = document.getElementById("dataStatusText");
-      statusEl.textContent = "Caricamento automatico file da ./data/...";
-
-      const sources = [
-        { path: "./data/all_leagues.csv", key: "combogesss_results", target: "resultsRows" },
-        { path: "./data/fixtures.xlsx", key: "combogesss_fixtures", target: "fixturesRows" }
-      ];
-
-      let loadedAny = false;
-
-      for (const src of sources) {
-        try {
-          const resp = await fetch(`${src.path}?t=${Date.now()}`, { cache: "no-store" });
-          if (!resp.ok) continue;
-
-          const buf = await resp.arrayBuffer();
-          const wb = XLSX.read(buf, { type: "array" });
-          const sheet = wb.Sheets[wb.SheetNames[0]];
-          const rows = XLSX.utils.sheet_to_json(sheet, { defval: "" });
-
-          if (Array.isArray(rows) && rows.length > 0) {
-            state[src.target] = rows;
-            localStorage.setItem(src.key, JSON.stringify(rows));
-            loadedAny = true;
-          }
-        } catch (err) {
-          console.warn(`Impossibile leggere ${src.path}:`, err);
-        }
-      }
-
-      if (!loadedAny && !forceReload) {
-        try {
-          const cachedRes = JSON.parse(localStorage.getItem("combogesss_results") || "[]");
-          const cachedFix = JSON.parse(localStorage.getItem("combogesss_fixtures") || "[]");
-          if (cachedRes.length || cachedFix.length) {
-            state.resultsRows = cachedRes;
-            state.fixturesRows = cachedFix;
-            loadedAny = true;
-          }
-        } catch (_) {}
-      }
-
-      state.roundsByLeague = organizeMatchesIntoRounds(state.resultsRows, state.fixturesRows);
-      const leagueRounds = state.roundsByLeague[state.selectedLeagueCode] || [];
-      state.selectedRound = leagueRounds.length ? leagueRounds[leagueRounds.length - 1].roundNumber : 1;
-
-      if (loadedAny) {
-        statusEl.textContent = `Dati caricati: ${state.resultsRows.length} risultati • ${state.fixturesRows.length} partite future`;
-      } else {
-        statusEl.textContent = "Anteprima dati (esegui lo script Python o carica Excel/CSV)";
-      }
-
-      renderAll();
-    }
-
-    async function handleManualUpload(event) {
-      const files = Array.from(event.target.files || []);
-      if (!files.length) return;
-
-      for (const file of files) {
-        const buf = await file.arrayBuffer();
-        const wb = XLSX.read(buf, { type: "array" });
-        const sheet = wb.Sheets[wb.SheetNames[0]];
-        const rows = XLSX.utils.sheet_to_json(sheet, { defval: "" });
-
-        if (file.name.toLowerCase().includes("fix")) {
-          state.fixturesRows = rows;
-          localStorage.setItem("combogesss_fixtures", JSON.stringify(rows));
-        } else {
-          state.resultsRows = [...state.resultsRows, ...rows];
-          localStorage.setItem("combogesss_results", JSON.stringify(state.resultsRows));
-        }
-      }
-
-      state.roundsByLeague = organizeMatchesIntoRounds(state.resultsRows, state.fixturesRows);
-      document.getElementById("dataStatusText").textContent =
-        `Importati ${files.length} file (${state.resultsRows.length} risultati • ${state.fixturesRows.length} future)`;
-      renderAll();
-    }
-
-    function renderCountries() {
-      const container = document.getElementById("countriesList");
-      container.innerHTML = NATIONS.map(nation => {
-        const active = nation.id === state.selectedCountry;
-        return `
-          <button
-            onclick="selectCountry('${nation.id}')"
-            class="w-full flex items-center justify-between px-3.5 py-3 rounded-xl border text-left transition ${
-              active
-                ? "bg-emerald-500/15 border-emerald-400/50 text-white shadow-lg shadow-emerald-950/30"
-                : "glass-card text-slate-200 hover:border-slate-600"
-            }"
-          >
-            <div class="flex items-center gap-3">
-              ${renderFlagBadge(nation, "w-7 h-5")}
-              <span class="font-semibold text-sm">${nation.name}</span>
-            </div>
-            <span class="text-xs ${active ? "text-emerald-300" : "text-slate-500"}">▶</span>
-          </button>
-        `;
-      }).join("");
-    }
-
-    function renderLeagues() {
-      const nation = NATIONS.find(n => n.id === state.selectedCountry) || NATIONS[0];
-      document.getElementById("selectedCountryBadge").innerHTML =
-        `${renderFlagBadge(nation, "w-5 h-3.5")} <span>${nation.name}</span>`;
-
-      const container = document.getElementById("leaguesList");
-      container.innerHTML = nation.leagues.map(lg => {
-        const active = lg.code === state.selectedLeagueCode;
-        const rounds = state.roundsByLeague[lg.code] || [];
-        const currentRoundObj = rounds.find(r => r.roundNumber === state.selectedRound) || rounds[rounds.length - 1];
-        const countMatches = currentRoundObj ? currentRoundObj.matches.length : lg.matchesPerRound;
-
-        return `
-          <button
-            onclick="selectLeague('${lg.code}')"
-            class="w-full p-3.5 rounded-xl border text-left transition ${
-              active
-                ? "bg-emerald-500/15 border-emerald-400/50 text-white"
-                : "glass-card text-slate-200 hover:border-slate-600"
-            }"
-          >
-            <div class="flex items-center justify-between mb-1">
-              <span class="inline-flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-slate-800 text-emerald-300">
-                ${renderFlagBadge(nation, "w-4 h-3")}
-                <span>${lg.tier}</span>
-              </span>
-              <span class="text-[11px] text-slate-400">${countMatches} partite</span>
-            </div>
-            <div class="font-bold text-base">${lg.name}</div>
-          </button>
-        `;
-      }).join("");
-    }
-
-    function renderFormPills(arr) {
-      return (arr || []).slice(-5).map(res => {
-        const italianLabel = res === "W" ? "V" : res === "D" ? "P" : "S";
-        return `<span class="form-pill form-${res}" title="${italianLabel}">${italianLabel}</span>`;
-      }).join("");
-    }
-
-    function renderMatches() {
-      const meta = getLeagueMeta(state.selectedLeagueCode);
-      const rounds = state.roundsByLeague[state.selectedLeagueCode] || [];
-      const roundObj = rounds.find(r => r.roundNumber === state.selectedRound) || rounds[0];
-
-      document.getElementById("currentLeagueTitle").innerHTML = `
-        ${renderFlagBadge(meta.nation, "w-6 h-4")}
-        <span>${meta.name}</span>
-        <span class="inline-flex items-center gap-1.5 text-xs font-normal text-slate-400">
-          (${meta.country} • ${meta.tier})
-        </span>
-      `;
-
-      const roundSelect = document.getElementById("roundSelect");
-      roundSelect.innerHTML = rounds.map(r =>
-        `<option value="${r.roundNumber}" ${r.roundNumber === (roundObj && roundObj.roundNumber) ? "selected" : ""}>${r.label}</option>`
-      ).join("");
-
-      const matches = roundObj ? roundObj.matches : [];
-      document.getElementById("currentLeagueSubtitle").textContent =
-        `${roundObj ? roundObj.label : "Giornata"} • ${matches.length} partite • Clicca una card per le statistiche`;
-
-      const listEl = document.getElementById("matchesList");
-      if (!matches.length) {
-        listEl.innerHTML = `<div class="glass-card rounded-xl p-6 text-center text-sm text-slate-400">Nessuna partita disponibile per questa giornata.</div>`;
-        return;
-      }
-
-      listEl.innerHTML = matches.map(m => {
-        const dateTimeStr = [m.date, m.time].filter(Boolean).join(" • ");
-        const isDiffBomb = clampPct(m.diffForm) >= 90;
-        return `
-          <div
-            onclick="openMatchStats('${m.id}')"
-            role="button"
-            tabindex="0"
-            onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openMatchStats('${m.id}');}"
-            class="glass-card rounded-xl p-3.5 hover:border-emerald-400/50 hover:bg-slate-900/80 transition cursor-pointer"
-          >
-            <div class="flex flex-wrap items-center justify-between gap-3">
-              <div class="text-left flex-1 min-w-[210px]">
-                <div class="flex items-center gap-2 text-sm font-bold text-white">
-                  ${renderFlagBadge(meta.nation, "w-4 h-3")}
-                  <span>${m.home}</span>
-                  <span class="text-slate-500 font-normal">vs</span>
-                  <span>${m.away}</span>
-                </div>
-                <div class="text-[11px] text-slate-400 mt-0.5">
-                  ${dateTimeStr || "Programma campionato"}
-                  ${m.ftResult ? ` • <span class="text-emerald-400 font-semibold">FT ${m.ftResult}</span>` : ""}
-                </div>
-              </div>
-
-              <!-- Stato di forma ultime 5 partite + Differenza positiva -->
-              <div class="flex items-center gap-3 flex-wrap">
-                <div class="text-right">
-                  <div class="text-[10px] uppercase tracking-wider text-slate-400">Stato di forma (ult. 5)</div>
-                  <div class="flex items-center gap-2 mt-1">
-                    <div class="flex items-center gap-1">${renderFormPills(m.homeFormArr)}</div>
-                    <span class="text-[11px]">${renderPctText(m.homeForm)}</span>
-                    <span class="text-slate-600">|</span>
-                    <div class="flex items-center gap-1">${renderFormPills(m.awayFormArr)}</div>
-                    <span class="text-[11px]">${renderPctText(m.awayForm)}</span>
-                  </div>
-                </div>
-
-                <div class="px-3 py-1.5 rounded-xl bg-slate-900/90 border border-slate-700/80 text-center min-w-[84px] ${isDiffBomb ? "flag-bomb" : ""}">
-                  <div class="text-[10px] uppercase tracking-wider text-slate-300 font-semibold">Diff. Forma</div>
-                  <div class="text-sm mt-0.5">${renderPctText(m.diffForm)}</div>
-                </div>
-              </div>
-            </div>
+    if (fam.layout === "over-under-rows") {
+      bodyHtml = `
+        <div class="space-y-2.5">
+          <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+            ${fam.overItems.map(renderStatChip).join("")}
           </div>
-        `;
-      }).join("");
+          <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+            ${fam.underItems.map(renderStatChip).join("")}
+          </div>
+        </div>
+      `;
+    } else if (fam.layout === "grid-2") {
+      bodyHtml = `
+        <div class="grid grid-cols-2 gap-2.5">
+          ${fam.items.map(renderStatChip).join("")}
+        </div>
+      `;
+    } else {
+      bodyHtml = `
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+          ${fam.items.map(renderStatChip).join("")}
+        </div>
+      `;
     }
 
-    function openMatchStats(matchId) {
-      const meta = getLeagueMeta(state.selectedLeagueCode);
-      const rounds = state.roundsByLeague[state.selectedLeagueCode] || [];
-      let foundMatch = null;
-      let foundRound = null;
+    const totalCount = fam.layout === "over-under-rows"
+      ? fam.overItems.length + fam.underItems.length
+      : fam.items.length;
 
-      for (const r of rounds) {
-        const hit = r.matches.find(x => x.id === matchId);
-        if (hit) {
-          foundMatch = hit;
-          foundRound = r;
-          break;
-        }
-      }
-      if (!foundMatch || typeof window.openMatchStatsScreen !== "function") return;
+    return `
+      <section class="rounded-2xl bg-slate-900/85 border border-slate-800 p-4 sm:p-5 space-y-3">
+        <div class="flex items-center justify-between border-b border-slate-800 pb-2.5">
+          <h3 class="text-sm sm:text-base font-extrabold text-emerald-300 tracking-wide">${fam.title}</h3>
+          <span class="text-[11px] text-slate-400">${totalCount} mercati</span>
+        </div>
+        ${bodyHtml}
+      </section>
+    `;
+  }
 
-      window.openMatchStatsScreen({
-        match: foundMatch,
-        roundNumber: foundRound ? foundRound.roundNumber : state.selectedRound,
-        roundLabel: foundRound ? foundRound.label : `Giornata ${state.selectedRound}`,
-        leagueCode: meta.code,
-        leagueName: meta.name,
-        countryName: meta.country,
-        flagHtml: renderFlagBadge(meta.nation, "w-5 h-3.5"),
-        resultsRows: state.resultsRows
-      });
-    }
+  function ensureOverlayElement() {
+    ensureColorStyles();
+    let el = document.getElementById(OVERLAY_ID);
+    if (el) return el;
 
-    function selectCountry(countryId) {
-      state.selectedCountry = countryId;
-      const nation = NATIONS.find(n => n.id === countryId);
-      if (nation && nation.leagues.length) {
-        state.selectedLeagueCode = nation.leagues[0].code;
-        const rounds = state.roundsByLeague[state.selectedLeagueCode] || [];
-        state.selectedRound = rounds.length ? rounds[rounds.length - 1].roundNumber : 1;
-      }
-      renderAll();
-    }
+    el = document.createElement("div");
+    el.id = OVERLAY_ID;
+    el.className = "fixed inset-0 z-50 hidden overflow-y-auto bg-slate-950/95 backdrop-blur-md text-slate-100";
+    el.innerHTML = `
+      <button
+        id="backToMatchesBtn"
+        type="button"
+        class="fixed top-4 left-4 z-[60] flex items-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs sm:text-sm font-extrabold shadow-xl shadow-emerald-950/60 border border-emerald-300/30 transition cursor-pointer"
+      >
+        <span>←</span>
+        <span>Torna alle partite</span>
+      </button>
 
-    function selectLeague(code) {
-      state.selectedLeagueCode = code;
-      const rounds = state.roundsByLeague[code] || [];
-      state.selectedRound = rounds.length ? rounds[rounds.length - 1].roundNumber : 1;
-      renderAll();
-    }
+      <div id="matchStatsScreenContent" class="max-w-6xl mx-auto px-4 pt-20 pb-14 space-y-6"></div>
+    `;
 
-    function selectRound(roundNum) {
-      state.selectedRound = Number(roundNum);
-      renderMatches();
-    }
+    document.body.appendChild(el);
 
-    function changeRound(delta) {
-      const rounds = state.roundsByLeague[state.selectedLeagueCode] || [];
-      if (!rounds.length) return;
-      const idx = rounds.findIndex(r => r.roundNumber === state.selectedRound);
-      const nextIdx = Math.max(0, Math.min(rounds.length - 1, idx + delta));
-      state.selectedRound = rounds[nextIdx].roundNumber;
-      renderMatches();
-    }
-
-    function renderAll() {
-      renderCountries();
-      renderLeagues();
-      renderMatches();
-    }
-
-    window.addEventListener("DOMContentLoaded", () => {
-      autoLoadComboGesssData();
+    document.getElementById("backToMatchesBtn").addEventListener("click", () => {
+      window.closeMatchStatsScreen();
     });
-  </script>
 
-  <script src="./statistiche-partita.js"></script>
-</body>
-</html>
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape" && !el.classList.contains("hidden")) {
+        window.closeMatchStatsScreen();
+      }
+    });
+
+    return el;
+  }
+
+  window.openMatchStatsScreen = function (options) {
+    const { match, roundNumber, roundLabel, leagueCode, leagueName, countryName, flagHtml, resultsRows } = options || {};
+    if (!match) return;
+
+    const overlay = ensureOverlayElement();
+    const content = document.getElementById("matchStatsScreenContent");
+
+    const dateStr = formatMatchDate(match.date);
+    const timeStr = formatMatchTime(match.time);
+    const dateTimeLabel = [dateStr, timeStr].filter(Boolean).join(" • ");
+    const giornataLabel = roundLabel || (roundNumber ? `Giornata ${roundNumber}` : "Giornata");
+
+    const homeFormVal = match.homeForm ?? 0;
+    const awayFormVal = match.awayForm ?? 0;
+    const diffFormVal = match.diffForm ?? Math.abs((match.homeForm || 0) - (match.awayForm || 0));
+
+    const computed = computeMatchFamilies(match, leagueCode, resultsRows);
+
+    content.innerHTML = `
+      <div class="rounded-2xl bg-gradient-to-br from-slate-900 via-slate-900 to-emerald-950/30 border border-slate-700/70 p-5 sm:p-6 shadow-2xl">
+        <div class="flex flex-wrap items-center justify-between gap-2 text-xs text-slate-300 mb-4">
+          <div class="flex items-center gap-2 font-semibold">
+            ${flagHtml || ""}
+            <span>${leagueName || leagueCode || ""}</span>
+            ${countryName ? `<span class="text-slate-500">•</span><span>${countryName}</span>` : ""}
+          </div>
+          <div class="flex flex-wrap items-center gap-2">
+            <span class="px-2.5 py-1 rounded-lg bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 font-bold">
+              ${giornataLabel}
+            </span>
+            <span class="px-2.5 py-1 rounded-lg bg-slate-800 text-slate-200 border border-slate-700 font-semibold">
+              ${dateTimeLabel}
+            </span>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 items-center gap-4 text-center">
+          <div class="rounded-xl bg-slate-950/70 border border-slate-800 p-4 space-y-2.5">
+            <div class="text-lg sm:text-xl font-extrabold text-white">${match.home}</div>
+            <div class="text-[11px] uppercase tracking-wider text-slate-400">Stato di forma (ult. 5)</div>
+            <div class="flex items-center justify-center gap-1.5">
+              ${renderFormPills(match.homeFormArr)}
+            </div>
+            <div class="text-sm">${renderPctBadge(homeFormVal, "px-2.5 py-0.5 rounded-lg")}</div>
+          </div>
+
+          <div class="space-y-2">
+            <div class="text-xs uppercase tracking-widest text-slate-400 font-bold">Partita</div>
+            <div class="text-2xl font-black text-white">VS</div>
+            ${match.ftResult ? `<div class="inline-block px-3 py-1 rounded-full text-xs font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">Finale: ${match.ftResult}</div>` : ""}
+            <div class="pt-1">
+              <div class="text-[11px] text-slate-400">Differenza Forma (Positiva)</div>
+              <div class="text-base mt-0.5">${renderPctBadge(diffFormVal, "px-2.5 py-0.5 rounded-lg")}</div>
+            </div>
+            <div class="text-[11px] text-slate-500">${computed.sampleInfo}</div>
+          </div>
+
+          <div class="rounded-xl bg-slate-950/70 border border-slate-800 p-4 space-y-2.5">
+            <div class="text-lg sm:text-xl font-extrabold text-white">${match.away}</div>
+            <div class="text-[11px] uppercase tracking-wider text-slate-400">Stato di forma (ult. 5)</div>
+            <div class="flex items-center justify-center gap-1.5">
+              ${renderFormPills(match.awayFormArr)}
+            </div>
+            <div class="text-sm">${renderPctBadge(awayFormVal, "px-2.5 py-0.5 rounded-lg")}</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="space-y-5">
+        ${computed.families.map(renderFamilySection).join("")}
+      </div>
+    `;
+
+    overlay.classList.remove("hidden");
+    overlay.scrollTop = 0;
+  };
+
+  window.closeMatchStatsScreen = function () {
+    const overlay = document.getElementById(OVERLAY_ID);
+    if (overlay) {
+      overlay.classList.add("hidden");
+    }
+  };
+})();

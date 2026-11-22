@@ -4,6 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>ComboGesss — Statistiche Calcio Top 5 & Serie Minori</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚽</text></svg>" />
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <style>
@@ -41,6 +42,53 @@
       color: #fca5a5;
       border: 1px solid rgba(239, 68, 68, 0.45);
     }
+
+    /* Colorazione percentuali */
+    .pct-red {
+      color: #f87171 !important;
+    }
+    .pct-white {
+      color: #f8fafc !important;
+    }
+    .pct-green {
+      color: #34d399 !important;
+    }
+    .pct-gold {
+      color: #facc15 !important;
+    }
+
+    @keyframes cgGoldPulse {
+      0%, 100% {
+        box-shadow: 0 0 0 0 rgba(250, 204, 21, 0.45), 0 0 14px rgba(250, 204, 21, 0.28);
+        transform: scale(1);
+      }
+      50% {
+        box-shadow: 0 0 0 5px rgba(250, 204, 21, 0.12), 0 0 22px rgba(250, 204, 21, 0.55);
+        transform: scale(1.02);
+      }
+    }
+
+    @keyframes cgBombBounce {
+      0%, 100% {
+        transform: translateY(0) rotate(-6deg) scale(1);
+      }
+      50% {
+        transform: translateY(-2px) rotate(8deg) scale(1.14);
+      }
+    }
+
+    .flag-bomb {
+      color: #facc15 !important;
+      border-color: rgba(250, 204, 21, 0.75) !important;
+      background: linear-gradient(135deg, rgba(250, 204, 21, 0.22), rgba(245, 158, 11, 0.12)) !important;
+      animation: cgGoldPulse 1.6s infinite ease-in-out;
+    }
+
+    .flag-bomb .bomb-icon {
+      display: inline-block;
+      animation: cgBombBounce 1.1s infinite ease-in-out;
+    }
+
     ::-webkit-scrollbar { width: 8px; height: 8px; }
     ::-webkit-scrollbar-track { background: #0b0f17; }
     ::-webkit-scrollbar-thumb { background: #263248; border-radius: 999px; }
@@ -67,7 +115,7 @@
       </div>
 
       <div class="flex items-center gap-2">
-        <button id="reloadDataBtn" onclick="autoLoadComboGesssData(true)" class="px-3 py-2 rounded-lg text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition">
+        <button id="reloadDataBtn" type="button" onclick="autoLoadComboGesssData(true)" class="px-3 py-2 rounded-lg text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition">
           🔄 Aggiorna Dati
         </button>
         <label class="px-3 py-2 rounded-lg text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 text-white cursor-pointer transition">
@@ -108,9 +156,9 @@
             <p id="currentLeagueSubtitle" class="text-xs text-slate-400 mt-0.5">Intera giornata ordinata per differenza di forma</p>
           </div>
           <div class="flex items-center gap-2">
-            <button onclick="changeRound(-1)" class="px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs font-bold text-slate-200 border border-slate-700">◀</button>
+            <button type="button" onclick="changeRound(-1)" class="px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs font-bold text-slate-200 border border-slate-700">◀</button>
             <select id="roundSelect" onchange="selectRound(this.value)" class="px-3 py-1.5 rounded-lg bg-slate-900 text-xs font-semibold text-white border border-slate-700 focus:outline-none focus:border-emerald-500"></select>
-            <button onclick="changeRound(1)" class="px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs font-bold text-slate-200 border border-slate-700">▶</button>
+            <button type="button" onclick="changeRound(1)" class="px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs font-bold text-slate-200 border border-slate-700">▶</button>
           </div>
         </div>
       </div>
@@ -182,6 +230,38 @@
       roundsByLeague: {}
     };
 
+    function clampPct(val) {
+      const n = Number(val);
+      if (!Number.isFinite(n)) return 0;
+      return Math.max(0, Math.min(100, n));
+    }
+
+    function formatPct(num) {
+      const fixed = clampPct(num).toFixed(1);
+      return `${fixed.endsWith(".0") ? fixed.slice(0, -2) : fixed.replace(".", ",")}%`;
+    }
+
+    function getPctColorClass(val) {
+      const p = clampPct(val);
+      if (p >= 90) return "pct-gold";
+      if (p >= 66.67) return "pct-green";
+      if (p >= 33.34) return "pct-white";
+      return "pct-red";
+    }
+
+    function renderPctText(val, extraClasses = "") {
+      const p = clampPct(val);
+      const isBomb = p >= 90;
+      const colorClass = getPctColorClass(p);
+      const bombClass = isBomb ? "flag-bomb" : "";
+      return `
+        <span class="inline-flex items-center gap-1 font-extrabold ${colorClass} ${bombClass} ${extraClasses}">
+          ${isBomb ? `<span class="bomb-icon" aria-hidden="true">💣</span>` : ""}
+          <span>${formatPct(p)}</span>
+        </span>
+      `;
+    }
+
     function renderFlagBadge(nationObj, sizeClass = "w-6 h-4") {
       if (!nationObj) return `<span class="text-base">⚽</span>`;
       return `
@@ -240,11 +320,6 @@
         else if (r === "D") score += 7.5;
       }
       return Number(score.toFixed(1));
-    }
-
-    function formatPct(num) {
-      const fixed = Number(num).toFixed(1);
-      return `${fixed.endsWith(".0") ? fixed.slice(0, -2) : fixed.replace(".", ",")}%`;
     }
 
     function getLeagueMeta(code) {
@@ -532,6 +607,7 @@
         const active = nation.id === state.selectedCountry;
         return `
           <button
+            type="button"
             onclick="selectCountry('${nation.id}')"
             class="w-full flex items-center justify-between px-3.5 py-3 rounded-xl border text-left transition ${
               active
@@ -563,6 +639,7 @@
 
         return `
           <button
+            type="button"
             onclick="selectLeague('${lg.code}')"
             class="w-full p-3.5 rounded-xl border text-left transition ${
               active
@@ -620,6 +697,7 @@
 
       listEl.innerHTML = matches.map(m => {
         const dateTimeStr = [m.date, m.time].filter(Boolean).join(" • ");
+        const isDiffBomb = clampPct(m.diffForm) >= 90;
         return `
           <div
             onclick="openMatchStats('${m.id}')"
@@ -648,16 +726,16 @@
                   <div class="text-[10px] uppercase tracking-wider text-slate-400">Stato di forma (ult. 5)</div>
                   <div class="flex items-center gap-2 mt-1">
                     <div class="flex items-center gap-1">${renderFormPills(m.homeFormArr)}</div>
-                    <span class="text-[11px] font-bold text-slate-200">${formatPct(m.homeForm)}</span>
+                    <span class="text-[11px]">${renderPctText(m.homeForm)}</span>
                     <span class="text-slate-600">|</span>
                     <div class="flex items-center gap-1">${renderFormPills(m.awayFormArr)}</div>
-                    <span class="text-[11px] font-bold text-slate-200">${formatPct(m.awayForm)}</span>
+                    <span class="text-[11px]">${renderPctText(m.awayForm)}</span>
                   </div>
                 </div>
 
-                <div class="px-3 py-1.5 rounded-xl bg-emerald-500/15 border border-emerald-500/35 text-center min-w-[78px]">
-                  <div class="text-[10px] uppercase tracking-wider text-emerald-300 font-semibold">Diff. Forma</div>
-                  <div class="text-sm font-extrabold text-white">${formatPct(m.diffForm)}</div>
+                <div class="px-3 py-1.5 rounded-xl bg-slate-900/90 border border-slate-700/80 text-center min-w-[84px] ${isDiffBomb ? "flag-bomb" : ""}">
+                  <div class="text-[10px] uppercase tracking-wider text-slate-300 font-semibold">Diff. Forma</div>
+                  <div class="text-sm mt-0.5">${renderPctText(m.diffForm)}</div>
                 </div>
               </div>
             </div>
