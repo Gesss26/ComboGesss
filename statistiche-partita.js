@@ -47,6 +47,11 @@
         display: inline-block;
         animation: cgBombBounce 1.1s infinite ease-in-out;
       }
+      .standings-team-gold {
+        background: linear-gradient(90deg, rgba(250, 204, 21, 0.22), rgba(245, 158, 11, 0.08)) !important;
+        border-color: rgba(250, 204, 21, 0.75) !important;
+        box-shadow: 0 0 16px rgba(250, 204, 21, 0.2);
+      }
     `;
     document.head.appendChild(style);
   }
@@ -165,7 +170,6 @@
         const homeXG = parseFloat(r.HomeXG ?? r.xG_H ?? r.H_xG);
         const awayXG = parseFloat(r.AwayXG ?? r.xG_A ?? r.A_xG);
         const xgf = isHome ? homeXG : awayXG;
-        const xga = isHome ? awayXG : homeXG;
 
         return {
           isHome,
@@ -174,8 +178,7 @@
           totalGoals,
           btts: hg > 0 && ag > 0,
           outcome,
-          xgf: Number.isFinite(xgf) ? xgf : null,
-          xga: Number.isFinite(xga) ? xga : null
+          xgf: Number.isFinite(xgf) ? xgf : null
         };
       });
   }
@@ -185,7 +188,7 @@
       const avgScored = fallbackScored;
       const avgConceded = fallbackConceded;
       const xg = Number(((avgScored * 0.65) + (avgConceded * 0.35)).toFixed(2));
-      return { avgScored, avgConceded, xg, isEstimatedXG: true };
+      return { avgScored, avgConceded, xg };
     }
 
     const totalScored = hist.reduce((s, x) => s + x.gf, 0);
@@ -194,16 +197,170 @@
     const avgConceded = Number((totalConceded / hist.length).toFixed(2));
 
     const xgRows = hist.filter(x => x.xgf !== null);
-    let xg;
-    let isEstimatedXG = false;
-    if (xgRows.length) {
-      xg = Number((xgRows.reduce((s, x) => s + x.xgf, 0) / xgRows.length).toFixed(2));
-    } else {
-      xg = Number(((avgScored * 0.62) + (avgConceded * 0.38)).toFixed(2));
-      isEstimatedXG = true;
+    const xg = xgRows.length
+      ? Number((xgRows.reduce((s, x) => s + x.xgf, 0) / xgRows.length).toFixed(2))
+      : Number(((avgScored * 0.62) + (avgConceded * 0.38)).toFixed(2));
+
+    return { avgScored, avgConceded, xg };
+  }
+
+  function computeLeagueStandings(match, leagueCode, resultsRows, fixturesRows) {
+    const divTarget = String(leagueCode || "").trim().toUpperCase();
+    const table = new Map();
+
+    const ensureTeam = (rawName) => {
+      const cleanName = String(rawName || "").trim();
+      if (!cleanName) return null;
+      const key = cleanName.toLowerCase();
+      if (!table.has(key)) {
+        table.set(key, {
+          name: cleanName,
+          key,
+          played: 0,
+          won: 0,
+          drawn: 0,
+          lost: 0,
+          gf: 0,
+          ga: 0,
+          gd: 0,
+          points: 0
+        });
+      }
+      return table.get(key);
+    };
+
+    const rows = Array.isArray(resultsRows) ? resultsRows : [];
+    for (const r of rows) {
+      const div = String(r.Div || r.DivCode || "").trim().toUpperCase();
+      if (divTarget && div && div !== divTarget) continue;
+
+      const homeTeam = ensureTeam(r.HomeTeam || r.Home);
+      const awayTeam = ensureTeam(r.AwayTeam || r.Away);
+      const hg = Number(r.FTHG);
+      const ag = Number(r.FTAG);
+      if (!homeTeam || !awayTeam || !Number.isFinite(hg) || !Number.isFinite(ag)) continue;
+
+      homeTeam.played += 1;
+      awayTeam.played += 1;
+      homeTeam.gf += hg;
+      homeTeam.ga += ag;
+      awayTeam.gf += ag;
+      awayTeam.ga += hg;
+
+      if (hg > ag) {
+        homeTeam.won += 1;
+        homeTeam.points += 3;
+        awayTeam.lost += 1;
+      } else if (hg < ag) {
+        awayTeam.won += 1;
+        awayTeam.points += 3;
+        homeTeam.lost += 1;
+      } else {
+        homeTeam.drawn += 1;
+        awayTeam.drawn += 1;
+        homeTeam.points += 1;
+        awayTeam.points += 1;
+      }
     }
 
-    return { avgScored, avgConceded, xg, isEstimatedXG };
+    // Assicura la presenza anche delle squadre presenti nelle partite future o nella partita corrente
+    const extraFixtures = Array.isArray(fixturesRows) ? fixturesRows : [];
+    for (const f of extraFixtures) {
+      const div = String(f.Div || f.DivCode || "").trim().toUpperCase();
+      if (divTarget && div && div !== divTarget) continue;
+      ensureTeam(f.HomeTeam || f.Home);
+      ensureTeam(f.AwayTeam || f.Away);
+    }
+    ensureTeam(match.home);
+    ensureTeam(match.away);
+
+    const list = Array.from(table.values()).map(item => ({
+      ...item,
+      gd: item.gf - item.ga
+    }));
+
+    list.sort((a, b) => {
+      if (b.points !== a.points) return b.points - a.points;
+      if (b.gd !== a.gd) return b.gd - a.gd;
+      if (b.gf !== a.gf) return b.gf - a.gf;
+      return a.name.localeCompare(b.name, "it");
+    });
+
+    return list;
+  }
+
+  function renderStandingsCard(standings, homeName, awayName, leagueName) {
+    const homeKey = String(homeName || "").trim().toLowerCase();
+    const awayKey = String(awayName || "").trim().toLowerCase();
+
+    if (!standings.length) {
+      return `
+        <aside class="rounded-2xl bg-slate-900/90 border border-slate-800 p-4 sm:p-5 space-y-3">
+          <div class="border-b border-slate-800 pb-2.5">
+            <h3 class="text-sm sm:text-base font-extrabold text-amber-300 tracking-wide">Classifica ${leagueName || ""}</h3>
+          </div>
+          <div class="text-xs text-slate-400">Nessun dato classifica disponibile.</div>
+        </aside>
+      `;
+    }
+
+    const rowsHtml = standings.map((row, idx) => {
+      const pos = idx + 1;
+      const isHighlighted = row.key === homeKey || row.key === awayKey;
+      const badgeRole = row.key === homeKey ? "CASA" : row.key === awayKey ? "TRASF." : "";
+
+      return `
+        <tr class="border-b border-slate-800/70 last:border-b-0 transition ${
+          isHighlighted ? "standings-team-gold text-amber-200 font-bold" : "hover:bg-slate-800/40 text-slate-200"
+        }">
+          <td class="py-2 pl-2 pr-1.5 text-xs ${isHighlighted ? "text-amber-300 font-extrabold" : "text-slate-400"}">${pos}</td>
+          <td class="py-2 px-1.5 text-xs">
+            <div class="flex items-center justify-between gap-1.5">
+              <span class="truncate ${isHighlighted ? "text-amber-200 font-extrabold" : "text-white font-semibold"}">${row.name}</span>
+              ${badgeRole ? `<span class="text-[9px] px-1.5 py-0.5 rounded bg-amber-400/20 text-amber-300 border border-amber-400/50 font-extrabold shrink-0">${badgeRole}</span>` : ""}
+            </div>
+          </td>
+          <td class="py-2 px-1 text-center text-xs ${isHighlighted ? "text-amber-200" : "text-slate-400"}">${row.played}</td>
+          <td class="py-2 px-1 text-center text-xs ${isHighlighted ? "text-amber-200" : "text-slate-400"}">${row.won}</td>
+          <td class="py-2 px-1 text-center text-xs ${isHighlighted ? "text-amber-200" : "text-slate-400"}">${row.drawn}</td>
+          <td class="py-2 px-1 text-center text-xs ${isHighlighted ? "text-amber-200" : "text-slate-400"}">${row.lost}</td>
+          <td class="py-2 px-1 text-center text-xs ${isHighlighted ? "text-amber-200" : "text-slate-300"}">${row.gd > 0 ? `+${row.gd}` : row.gd}</td>
+          <td class="py-2 pl-1 pr-2 text-right text-xs font-extrabold ${isHighlighted ? "text-amber-300" : "text-emerald-400"}">${row.points}</td>
+        </tr>
+      `;
+    }).join("");
+
+    return `
+      <aside class="rounded-2xl bg-slate-900/90 border border-slate-800 p-4 sm:p-5 space-y-3 lg:sticky lg:top-6">
+        <div class="flex items-center justify-between border-b border-slate-800 pb-2.5">
+          <div>
+            <h3 class="text-sm sm:text-base font-extrabold text-amber-300 tracking-wide">Classifica Campionato</h3>
+            <p class="text-[11px] text-slate-400">${homeName} e ${awayName} in evidenza oro</p>
+          </div>
+          <span class="text-[11px] text-amber-300/90 font-semibold">${standings.length} sq.</span>
+        </div>
+
+        <div class="overflow-x-auto">
+          <table class="w-full text-left border-collapse">
+            <thead>
+              <tr class="border-b border-slate-700/80 text-[10px] uppercase tracking-wider text-slate-400">
+                <th class="py-1.5 pl-2 pr-1.5">#</th>
+                <th class="py-1.5 px-1.5">Squadra</th>
+                <th class="py-1.5 px-1 text-center" title="Partite giocate">G</th>
+                <th class="py-1.5 px-1 text-center" title="Vinte">V</th>
+                <th class="py-1.5 px-1 text-center" title="Pareggiate">P</th>
+                <th class="py-1.5 px-1 text-center" title="Perse">S</th>
+                <th class="py-1.5 px-1 text-center" title="Differenza reti">DR</th>
+                <th class="py-1.5 pl-1 pr-2 text-right" title="Punti">Pt</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${rowsHtml}
+            </tbody>
+          </table>
+        </div>
+      </aside>
+    `;
   }
 
   function computeMatchFamilies(match, leagueCode, resultsRows) {
@@ -445,7 +602,7 @@
         <span>Torna alle partite</span>
       </button>
 
-      <div id="matchStatsScreenContent" class="max-w-6xl mx-auto px-4 pt-20 pb-14 space-y-6"></div>
+      <div id="matchStatsScreenContent" class="max-w-7xl mx-auto px-4 pt-20 pb-14"></div>
     `;
 
     document.body.appendChild(el);
@@ -464,7 +621,7 @@
   }
 
   window.openMatchStatsScreen = function (options) {
-    const { match, roundNumber, roundLabel, leagueCode, leagueName, countryName, flagHtml, resultsRows } = options || {};
+    const { match, roundNumber, roundLabel, leagueCode, leagueName, countryName, flagHtml, resultsRows, fixturesRows } = options || {};
     if (!match) return;
 
     const overlay = ensureOverlayElement();
@@ -480,90 +637,101 @@
     const diffFormVal = match.diffForm ?? Math.abs((match.homeForm || 0) - (match.awayForm || 0));
 
     const computed = computeMatchFamilies(match, leagueCode, resultsRows);
+    const standings = computeLeagueStandings(match, leagueCode, resultsRows, fixturesRows);
     const hm = computed.homeMetrics;
     const am = computed.awayMetrics;
 
     content.innerHTML = `
-      <div class="rounded-2xl bg-gradient-to-br from-slate-900 via-slate-900 to-emerald-950/30 border border-slate-700/70 p-5 sm:p-6 shadow-2xl">
-        <div class="flex flex-wrap items-center justify-between gap-2 text-xs text-slate-300 mb-4">
-          <div class="flex items-center gap-2 font-semibold">
-            ${flagHtml || ""}
-            <span>${leagueName || leagueCode || ""}</span>
-            ${countryName ? `<span class="text-slate-500">•</span><span>${countryName}</span>` : ""}
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+        <!-- Colonna Sinistra: Statistiche Partita & Famiglie di Giocata -->
+        <div class="lg:col-span-7 space-y-5">
+          <div class="rounded-2xl bg-gradient-to-br from-slate-900 via-slate-900 to-emerald-950/30 border border-slate-700/70 p-5 sm:p-6 shadow-2xl">
+            <div class="flex flex-wrap items-center justify-between gap-2 text-xs text-slate-300 mb-4">
+              <div class="flex items-center gap-2 font-semibold">
+                ${flagHtml || ""}
+                <span>${leagueName || leagueCode || ""}</span>
+                ${countryName ? `<span class="text-slate-500">•</span><span>${countryName}</span>` : ""}
+              </div>
+              <div class="flex flex-wrap items-center gap-2">
+                <span class="px-2.5 py-1 rounded-lg bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 font-bold">
+                  ${giornataLabel}
+                </span>
+                <span class="px-2.5 py-1 rounded-lg bg-slate-800 text-slate-200 border border-slate-700 font-semibold">
+                  ${dateTimeLabel}
+                </span>
+              </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 items-center gap-4 text-center">
+              <!-- Squadra Casa -->
+              <div class="rounded-xl bg-slate-950/70 border border-slate-800 p-4 space-y-2.5">
+                <div class="text-lg sm:text-xl font-extrabold text-amber-300">${match.home}</div>
+                <div class="text-[11px] uppercase tracking-wider text-slate-400">Stato di forma (ult. 5)</div>
+                <div class="flex items-center justify-center gap-1.5">
+                  ${renderFormPills(match.homeFormArr)}
+                </div>
+                <div class="text-sm">${renderPctBadge(homeFormVal, "px-2.5 py-0.5 rounded-lg")}</div>
+                <div class="pt-1 border-t border-slate-800/80 text-xs text-slate-300 space-y-1">
+                  <div>
+                    Media Gol: <strong class="text-emerald-300">${hm.avgScored.toFixed(2)}</strong>
+                    <span class="text-slate-500">/</span>
+                    <strong class="text-rose-300">${hm.avgConceded.toFixed(2)}</strong>
+                    <span class="text-[10px] text-slate-400">(F/S)</span>
+                  </div>
+                  <div>
+                    xG Squadra: <strong class="text-amber-300">${hm.xg.toFixed(2)}</strong>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Centro Partita -->
+              <div class="space-y-2">
+                <div class="text-xs uppercase tracking-widest text-slate-400 font-bold">Partita</div>
+                <div class="text-2xl font-black text-white">VS</div>
+                ${match.ftResult ? `<div class="inline-block px-3 py-1 rounded-full text-xs font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">Finale: ${match.ftResult}</div>` : ""}
+                <div class="pt-1">
+                  <div class="text-[11px] text-slate-400">Differenza Forma (Positiva)</div>
+                  <div class="text-base mt-0.5">${renderPctBadge(diffFormVal, "px-2.5 py-0.5 rounded-lg")}</div>
+                </div>
+                <div class="rounded-xl bg-slate-950/70 border border-slate-800 px-3 py-2 inline-block">
+                  <div class="text-[10px] uppercase tracking-wider text-slate-400">xG Partita Stimato</div>
+                  <div class="text-sm font-extrabold text-amber-300">${computed.matchXG.toFixed(2)}</div>
+                </div>
+                <div class="text-[11px] text-slate-500">${computed.sampleInfo}</div>
+              </div>
+
+              <!-- Squadra Trasferta -->
+              <div class="rounded-xl bg-slate-950/70 border border-slate-800 p-4 space-y-2.5">
+                <div class="text-lg sm:text-xl font-extrabold text-amber-300">${match.away}</div>
+                <div class="text-[11px] uppercase tracking-wider text-slate-400">Stato di forma (ult. 5)</div>
+                <div class="flex items-center justify-center gap-1.5">
+                  ${renderFormPills(match.awayFormArr)}
+                </div>
+                <div class="text-sm">${renderPctBadge(awayFormVal, "px-2.5 py-0.5 rounded-lg")}</div>
+                <div class="pt-1 border-t border-slate-800/80 text-xs text-slate-300 space-y-1">
+                  <div>
+                    Media Gol: <strong class="text-sky-300">${am.avgScored.toFixed(2)}</strong>
+                    <span class="text-slate-500">/</span>
+                    <strong class="text-rose-300">${am.avgConceded.toFixed(2)}</strong>
+                    <span class="text-[10px] text-slate-400">(F/S)</span>
+                  </div>
+                  <div>
+                    xG Squadra: <strong class="text-amber-300">${am.xg.toFixed(2)}</strong>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
-          <div class="flex flex-wrap items-center gap-2">
-            <span class="px-2.5 py-1 rounded-lg bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 font-bold">
-              ${giornataLabel}
-            </span>
-            <span class="px-2.5 py-1 rounded-lg bg-slate-800 text-slate-200 border border-slate-700 font-semibold">
-              ${dateTimeLabel}
-            </span>
+
+          <div class="space-y-5">
+            ${computed.families.map(renderFamilySection).join("")}
           </div>
         </div>
 
-        <div class="grid grid-cols-1 md:grid-cols-3 items-center gap-4 text-center">
-          <!-- Squadra Casa -->
-          <div class="rounded-xl bg-slate-950/70 border border-slate-800 p-4 space-y-2.5">
-            <div class="text-lg sm:text-xl font-extrabold text-white">${match.home}</div>
-            <div class="text-[11px] uppercase tracking-wider text-slate-400">Stato di forma (ult. 5)</div>
-            <div class="flex items-center justify-center gap-1.5">
-              ${renderFormPills(match.homeFormArr)}
-            </div>
-            <div class="text-sm">${renderPctBadge(homeFormVal, "px-2.5 py-0.5 rounded-lg")}</div>
-            <div class="pt-1 border-t border-slate-800/80 text-xs text-slate-300 space-y-1">
-              <div>
-                Media Gol: <strong class="text-emerald-300">${hm.avgScored.toFixed(2)}</strong>
-                <span class="text-slate-500">/</span>
-                <strong class="text-rose-300">${hm.avgConceded.toFixed(2)}</strong>
-                <span class="text-[10px] text-slate-400">(F/S)</span>
-              </div>
-              <div>
-                xG Squadra: <strong class="text-amber-300">${hm.xg.toFixed(2)}</strong>
-              </div>
-            </div>
-          </div>
-
-          <!-- Centro Partita -->
-          <div class="space-y-2">
-            <div class="text-xs uppercase tracking-widest text-slate-400 font-bold">Partita</div>
-            <div class="text-2xl font-black text-white">VS</div>
-            ${match.ftResult ? `<div class="inline-block px-3 py-1 rounded-full text-xs font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">Finale: ${match.ftResult}</div>` : ""}
-            <div class="pt-1">
-              <div class="text-[11px] text-slate-400">Differenza Forma (Positiva)</div>
-              <div class="text-base mt-0.5">${renderPctBadge(diffFormVal, "px-2.5 py-0.5 rounded-lg")}</div>
-            </div>
-            <div class="rounded-xl bg-slate-950/70 border border-slate-800 px-3 py-2 inline-block">
-              <div class="text-[10px] uppercase tracking-wider text-slate-400">xG Partita Stimato</div>
-              <div class="text-sm font-extrabold text-amber-300">${computed.matchXG.toFixed(2)}</div>
-            </div>
-            <div class="text-[11px] text-slate-500">${computed.sampleInfo}</div>
-          </div>
-
-          <!-- Squadra Trasferta -->
-          <div class="rounded-xl bg-slate-950/70 border border-slate-800 p-4 space-y-2.5">
-            <div class="text-lg sm:text-xl font-extrabold text-white">${match.away}</div>
-            <div class="text-[11px] uppercase tracking-wider text-slate-400">Stato di forma (ult. 5)</div>
-            <div class="flex items-center justify-center gap-1.5">
-              ${renderFormPills(match.awayFormArr)}
-            </div>
-            <div class="text-sm">${renderPctBadge(awayFormVal, "px-2.5 py-0.5 rounded-lg")}</div>
-            <div class="pt-1 border-t border-slate-800/80 text-xs text-slate-300 space-y-1">
-              <div>
-                Media Gol: <strong class="text-sky-300">${am.avgScored.toFixed(2)}</strong>
-                <span class="text-slate-500">/</span>
-                <strong class="text-rose-300">${am.avgConceded.toFixed(2)}</strong>
-                <span class="text-[10px] text-slate-400">(F/S)</span>
-              </div>
-              <div>
-                xG Squadra: <strong class="text-amber-300">${am.xg.toFixed(2)}</strong>
-              </div>
-            </div>
-          </div>
+        <!-- Colonna Destra: Classifica Campionato con le 2 squadre in oro -->
+        <div class="lg:col-span-5">
+          ${renderStandingsCard(standings, match.home, match.away, leagueName || leagueCode)}
         </div>
-      </div>
-
-      <div class="space-y-5">
-        ${computed.families.map(renderFamilySection).join("")}
       </div>
     `;
 
