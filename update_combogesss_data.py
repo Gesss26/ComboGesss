@@ -205,11 +205,12 @@ def download_fixtures_excel(dest_path: str) -> None:
 
 
 def sync_euro_excel(out_dir: str) -> None:
-    """Scarica o ispeziona all-euro-data-2026-2027.xlsx dentro data/ e normalizza le date."""
+    """Scarica (ogni volta) all-euro-data-2026-2027.xlsx dentro data/ e normalizza le date."""
     local_excel = os.path.join(out_dir, EURO_EXCEL_NAME)
-    if not os.path.exists(local_excel):
-        candidate_url = urljoin(BASE_URL, f"mmz4281/{SEASON}/{EURO_EXCEL_NAME}")
-        download_file(candidate_url, local_excel)
+    # Riscarica sempre il file (così ogni esecuzione giornaliera lo aggiorna);
+    # se il download fallisce, resta la copia precedente.
+    candidate_url = urljoin(BASE_URL, f"mmz4281/{SEASON}/{EURO_EXCEL_NAME}")
+    download_file(candidate_url, local_excel)
 
     if os.path.exists(local_excel):
         try:
