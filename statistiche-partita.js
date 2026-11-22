@@ -909,6 +909,9 @@
   function renderGoalFreqColumn(teamName, histList, accentClass, barClass, sideLabel) {
     const homeGames = histList.filter(g => g.isHome);
     const awayGames = histList.filter(g => !g.isHome);
+    // Nei totali sotto il nome squadra le gare chiuse a 0 gol non vengono contate
+    const homeScoring = homeGames.filter(g => g.gf > 0).length;
+    const awayScoring = awayGames.filter(g => g.gf > 0).length;
 
     const rows = GOAL_BUCKETS.map(b => {
       const h = homeGames.filter(g => b.test(g.gf)).length;
@@ -936,7 +939,7 @@
         <div class="border-b border-slate-800 pb-2">
           <div class="text-[10px] uppercase tracking-wider text-slate-500 font-bold">${sideLabel}</div>
           <h4 class="text-sm font-extrabold truncate ${accentClass}">${teamName}</h4>
-          <p class="text-[11px] text-slate-400">${homeGames.length} in casa • ${awayGames.length} fuori • ${histList.length} totali</p>
+          <p class="text-[11px] text-slate-400">${homeScoring} in casa • ${awayScoring} fuori • ${homeScoring + awayScoring} totali</p>
         </div>
 
         <div class="grid grid-cols-[auto_1fr_1fr] gap-x-2 sm:gap-x-3 gap-y-2.5 items-center">
