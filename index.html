@@ -116,15 +116,6 @@
       </div>
 
       <div id="matchesList" class="space-y-2.5"></div>
-
-      <!-- Dettaglio Statistico Partita Selezionata -->
-      <div id="matchStatsBox" class="glass-card rounded-2xl p-4 hidden">
-        <div class="flex items-center justify-between mb-3">
-          <div id="statsMatchTitle" class="flex items-center gap-2 text-sm font-bold text-emerald-300"></div>
-          <button onclick="document.getElementById('matchStatsBox').classList.add('hidden')" class="text-xs text-slate-400 hover:text-white">Chiudi ✕</button>
-        </div>
-        <div id="statsMatchBody" class="grid grid-cols-3 gap-2 text-center text-xs"></div>
-      </div>
     </section>
   </main>
 
@@ -191,7 +182,6 @@
       roundsByLeague: {}
     };
 
-    // Helper per renderizzare sempre la bandiera senza mai mostrare sigle
     function renderFlagBadge(nationObj, sizeClass = "w-6 h-4") {
       if (!nationObj) return `<span class="text-base">⚽</span>`;
       return `
@@ -208,7 +198,6 @@
       `;
     }
 
-    // Converte seriale Excel (es. 46347) o stringa data in DD/MM/YYYY
     function formatExcelDate(val) {
       if (val === null || val === undefined || val === "") return "";
       if (typeof val === "number" && Number.isFinite(val)) {
@@ -227,7 +216,6 @@
       return str;
     }
 
-    // Converte frazione di giorno Excel (es. 0.5833333333333334 -> 14:00) o stringa ora in HH:MM
     function formatExcelTime(val) {
       if (val === null || val === undefined || val === "") return "";
       if (typeof val === "number" && Number.isFinite(val)) {
@@ -244,7 +232,6 @@
       return str.slice(0, 5);
     }
 
-    // Punteggio forma: Vittoria = 20, Pareggio = 7.5, Sconfitta = 0 (ultime 5 partite)
     function computeFormScore(resultsArr) {
       const last5 = (resultsArr || []).slice(-5);
       let score = 0;
@@ -623,7 +610,7 @@
 
       const matches = roundObj ? roundObj.matches : [];
       document.getElementById("currentLeagueSubtitle").textContent =
-        `${roundObj ? roundObj.label : "Giornata"} • ${matches.length} partite • Ordinate per Diff. Forma (V=20, P=7,5, S=0)`;
+        `${roundObj ? roundObj.label : "Giornata"} • ${matches.length} partite • Clicca una card per le statistiche`;
 
       const listEl = document.getElementById("matchesList");
       if (!matches.length) {
@@ -634,10 +621,16 @@
       listEl.innerHTML = matches.map(m => {
         const dateTimeStr = [m.date, m.time].filter(Boolean).join(" • ");
         return `
-          <div class="glass-card rounded-xl p-3.5 hover:border-slate-600 transition">
+          <div
+            onclick="openMatchStats('${m.id}')"
+            role="button"
+            tabindex="0"
+            onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openMatchStats('${m.id}');}"
+            class="glass-card rounded-xl p-3.5 hover:border-emerald-400/50 hover:bg-slate-900/80 transition cursor-pointer"
+          >
             <div class="flex flex-wrap items-center justify-between gap-3">
-              <button onclick="openMatchStats('${m.id}')" class="text-left group flex-1 min-w-[210px]">
-                <div class="flex items-center gap-2 text-sm font-bold text-white group-hover:text-emerald-300 transition">
+              <div class="text-left flex-1 min-w-[210px]">
+                <div class="flex items-center gap-2 text-sm font-bold text-white">
                   ${renderFlagBadge(meta.nation, "w-4 h-3")}
                   <span>${m.home}</span>
                   <span class="text-slate-500 font-normal">vs</span>
@@ -647,7 +640,7 @@
                   ${dateTimeStr || "Programma campionato"}
                   ${m.ftResult ? ` • <span class="text-emerald-400 font-semibold">FT ${m.ftResult}</span>` : ""}
                 </div>
-              </button>
+              </div>
 
               <!-- Stato di forma ultime 5 partite + Differenza positiva -->
               <div class="flex items-center gap-3 flex-wrap">
@@ -677,32 +670,28 @@
       const meta = getLeagueMeta(state.selectedLeagueCode);
       const rounds = state.roundsByLeague[state.selectedLeagueCode] || [];
       let foundMatch = null;
+      let foundRound = null;
+
       for (const r of rounds) {
         const hit = r.matches.find(x => x.id === matchId);
-        if (hit) { foundMatch = hit; break; }
+        if (hit) {
+          foundMatch = hit;
+          foundRound = r;
+          break;
+        }
       }
-      if (!foundMatch) return;
+      if (!foundMatch || typeof window.openMatchStatsScreen !== "function") return;
 
-      const box = document.getElementById("matchStatsBox");
-      box.classList.remove("hidden");
-      document.getElementById("statsMatchTitle").innerHTML = `
-        ${renderFlagBadge(meta.nation, "w-5 h-3.5")}
-        <span>${foundMatch.home} vs ${foundMatch.away} (${[foundMatch.date, foundMatch.time].filter(Boolean).join(" • ")})</span>
-      `;
-      document.getElementById("statsMatchBody").innerHTML = `
-        <div class="bg-slate-900/80 rounded-lg p-2.5 border border-slate-800">
-          <div class="text-slate-400">Forma ${foundMatch.home}</div>
-          <div class="font-bold text-sm text-emerald-300 mt-1">${formatPct(foundMatch.homeForm)}</div>
-        </div>
-        <div class="bg-slate-900/80 rounded-lg p-2.5 border border-slate-800">
-          <div class="text-slate-400">Differenza (Positiva)</div>
-          <div class="font-bold text-sm text-white mt-1">${formatPct(foundMatch.diffForm)}</div>
-        </div>
-        <div class="bg-slate-900/80 rounded-lg p-2.5 border border-slate-800">
-          <div class="text-slate-400">Forma ${foundMatch.away}</div>
-          <div class="font-bold text-sm text-sky-300 mt-1">${formatPct(foundMatch.awayForm)}</div>
-        </div>
-      `;
+      window.openMatchStatsScreen({
+        match: foundMatch,
+        roundNumber: foundRound ? foundRound.roundNumber : state.selectedRound,
+        roundLabel: foundRound ? foundRound.label : `Giornata ${state.selectedRound}`,
+        leagueCode: meta.code,
+        leagueName: meta.name,
+        countryName: meta.country,
+        flagHtml: renderFlagBadge(meta.nation, "w-5 h-3.5"),
+        resultsRows: state.resultsRows
+      });
     }
 
     function selectCountry(countryId) {
@@ -747,5 +736,7 @@
       autoLoadComboGesssData();
     });
   </script>
+
+  <script src="./statistiche-partita.js"></script>
 </body>
 </html>
