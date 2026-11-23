@@ -9,6 +9,35 @@
     locked: {}, all: [], page: 0, tab: "gen", saved: {}
   };
 
+  const OPTS = {
+    tol: [[0.1, "± 0,10"], [0.15, "± 0,15"], [0.25, "± 0,25"], [0.4, "± 0,40"]],
+    min: [[1, 1], [2, 2], [3, 3], [4, 4], [5, 5]],
+    max: [[2, 2], [3, 3], [4, 4], [5, 5], [6, 6]],
+    mode: [["sicura", "🛡️ Sicura (più probabile)"], ["value", "💎 Value (quote reali)"], ["random", "🎲 Sorprendi"]],
+    source: [["media", "Media Reali + Dixon-Cole"], ["real", "Solo Reali"], ["dixon", "Solo Dixon-Cole"]],
+    scope: [["1d", "Solo oggi"], ["3d", "Prossimi 3 giorni"], ["7d", "Prossimi 7 giorni"], ["league", "Campionato selezionato"]],
+    pct: [[50, "50%"], [60, "60%"], [70, "70%"], [80, "80%"]]
+  };
+  const DEF_KEY = "combogesss_schedina_defaults";
+  const DEF_FIELDS = ["target", "tol", "minLegs", "maxLegs", "mode", "source", "scope", "minPct", "includeFair"];
+  const DEF_FACTORY = { target: 3, tol: 0.15, minLegs: 2, maxLegs: 4, mode: "sicura", source: "media", scope: "7d", minPct: 60, includeFair: true };
+  try {
+    const d = JSON.parse(localStorage.getItem(DEF_KEY) || "null");
+    if (d) DEF_FIELDS.forEach(k => { if (d[k] !== undefined) ST[k] = d[k]; });
+  } catch (_) {}
+  function getDefaults() { const o = {}; DEF_FIELDS.forEach(k => o[k] = ST[k]); return o; }
+  function setDefaults(d) {
+    DEF_FIELDS.forEach(k => { if (d && d[k] !== undefined) ST[k] = d[k]; });
+    try { localStorage.setItem(DEF_KEY, JSON.stringify(getDefaults())); } catch (_) {}
+  }
+  function resetDefaults() { try { localStorage.removeItem(DEF_KEY); } catch (_) {} DEF_FIELDS.forEach(k => ST[k] = DEF_FACTORY[k]); }
+  function settle(legs) {
+    const sts = (legs || []).map(legStatus);
+    if (sts.includes(false)) return "lost";
+    if (sts.length && sts.every(x => x === true)) return "won";
+    return "open";
+  }
+
   const $ = (s, r) => (r || document).querySelector(s);
   const esc = s => String(s == null ? "" : s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
   const f2 = n => Number(n).toFixed(2);
@@ -225,6 +254,7 @@
         <div class="sk-actions">
           <button class="sk-btn" data-act="save" data-idx="${idx}">${ST.saved[idx] ? "Salvata ✓" : "💾 Salva"}</button>
           <button class="sk-btn" data-act="copy" data-idx="${idx}">📋 Copia testo</button>
+          <button class="sk-btn" data-act="conto" data-idx="${idx}">💰 Aggiungi al Conto</button>
         </div>
       </div>`;
   }
@@ -263,7 +293,7 @@
         <div class="sk-card">
           <div class="sk-card-h">
             <div><span class="sk-big">@${f2(s.odd)}</span> ${badge}<div class="sk-dim sk-small">${esc(new Date(s.createdAt).toLocaleString("it-IT"))}</div></div>
-            <div class="sk-right">Prob. stimata ${pctTxt(s.prob * 100)}<br><button class="sk-btn sk-mini" data-act="del" data-i="${i}">🗑️ Elimina</button></div>
+            <div class="sk-right">Prob. stimata ${pctTxt(s.prob * 100)}<br><button class="sk-btn sk-mini" data-act="conto-h" data-i="${i}">💰 Conto</button> <button class="sk-btn sk-mini" data-act="del" data-i="${i}">🗑️</button></div>
           </div>
           ${s.legs.map((l, k) => legRow(l, { hist: true, status: sts[k] })).join("")}
         </div>`;
@@ -314,6 +344,8 @@
       a.unshift({ createdAt: Date.now(), odd: c.odd, prob: c.prob, legs: c.legs.map(l => ({ code: l.code, home: l.home, away: l.away, date: l.date, time: l.time, label: l.label, pct: l.pct, odd: l.odd, oddType: l.oddType })) });
       storeSaved(a); ST.saved[t.dataset.idx] = true; t.textContent = "Salvata ✓";
     }
+    else if (act === "conto") { if (window.CGConto) window.CGConto.addFromSchedina(ST.all[+t.dataset.idx], t); }
+    else if (act === "conto-h") { const s = loadSaved()[+t.dataset.i]; if (s && window.CGConto) window.CGConto.addFromSchedina(s, t); }
     else if (act === "del") { const a = loadSaved(); a.splice(+t.dataset.i, 1); storeSaved(a); renderHistory(); }
     else if (act === "chip") { $("#sk-target").value = t.dataset.v; ST.target = +t.dataset.v; }
   }
@@ -360,13 +392,13 @@
               <input id="sk-target" type="number" step="0.1" min="1.2" value="${ST.target}">
               <span class="sk-chips">${[2, 3, 5, 10].map(v => `<button class="sk-chip" data-act="chip" data-v="${v}">${v}</button>`).join("")}</span>
             </label>
-            <label>Tolleranza<select id="sk-tol">${opt([[0.1, "± 0,10"], [0.15, "± 0,15"], [0.25, "± 0,25"], [0.4, "± 0,40"]], ST.tol)}</select></label>
-            <label>Eventi min<select id="sk-min">${opt([[1, 1], [2, 2], [3, 3], [4, 4], [5, 5]], ST.minLegs)}</select></label>
-            <label>Eventi max<select id="sk-max">${opt([[2, 2], [3, 3], [4, 4], [5, 5], [6, 6]], ST.maxLegs)}</select></label>
-            <label>Modalità<select id="sk-mode">${opt([["sicura", "🛡️ Sicura (più probabile)"], ["value", "💎 Value (quote reali)"], ["random", "🎲 Sorprendi"]], ST.mode)}</select></label>
-            <label>Fonte stime<select id="sk-source">${opt([["media", "Media Reali + Dixon-Cole"], ["real", "Solo Reali"], ["dixon", "Solo Dixon-Cole"]], ST.source)}</select></label>
-            <label>Ambito<select id="sk-scope">${opt([["1d", "Solo oggi"], ["3d", "Prossimi 3 giorni"], ["7d", "Prossimi 7 giorni"], ["league", "Campionato selezionato"]], ST.scope)}</select></label>
-            <label>Prob. minima evento<select id="sk-pct">${opt([[50, "50%"], [60, "60%"], [70, "70%"], [80, "80%"]], ST.minPct)}</select></label>
+            <label>Tolleranza<select id="sk-tol">${opt(OPTS.tol, ST.tol)}</select></label>
+            <label>Eventi min<select id="sk-min">${opt(OPTS.min, ST.minLegs)}</select></label>
+            <label>Eventi max<select id="sk-max">${opt(OPTS.max, ST.maxLegs)}</select></label>
+            <label>Modalità<select id="sk-mode">${opt(OPTS.mode, ST.mode)}</select></label>
+            <label>Fonte stime<select id="sk-source">${opt(OPTS.source, ST.source)}</select></label>
+            <label>Ambito<select id="sk-scope">${opt(OPTS.scope, ST.scope)}</select></label>
+            <label>Prob. minima evento<select id="sk-pct">${opt(OPTS.pct, ST.minPct)}</select></label>
             <label class="sk-check"><input id="sk-fair" type="checkbox" ${ST.includeFair ? "checked" : ""}> Includi quote equa (stimate)</label>
           </div>
           <button class="sk-btn sk-primary sk-wide" data-act="gen">⚡ Genera schedine</button>
@@ -443,5 +475,5 @@
     rb.parentElement.insertBefore(b, rb);
   }
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", mount); else mount();
-  window.CGSchedina = { open, close };
+  window.CGSchedina = { open, close, settle, getDefaults, setDefaults, resetDefaults, OPTS };
 })();
