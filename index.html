@@ -386,9 +386,41 @@
     ::selection { background: rgba(34, 211, 238, 0.35); color: #fff; }
     ::-webkit-scrollbar-track { background: #04112a; }
     ::-webkit-scrollbar-thumb { background: linear-gradient(180deg, #0e7490, #1d4ed8); border-radius: 999px; }
+
+    /* Splashscreen iniziale */
+    #splashScreen {
+      position: fixed; inset: 0; z-index: 99999;
+      display: flex; align-items: center; justify-content: center;
+      background: radial-gradient(circle at 50% 45%, #0b2a4a 0%, #04112a 55%, #020817 100%);
+      opacity: 1; visibility: visible;
+      transition: opacity 0.6s ease, visibility 0.6s ease;
+    }
+    #splashScreen.splash-hide { opacity: 0; visibility: hidden; pointer-events: none; }
+    #splashScreen img {
+      width: min(60vw, 360px); height: auto;
+      animation: splashIn 0.9s ease-out both;
+      filter: drop-shadow(0 0 28px rgba(34, 211, 238, 0.35));
+    }
+    @keyframes splashIn {
+      from { opacity: 0; transform: scale(0.85); }
+      to   { opacity: 1; transform: scale(1); }
+    }
   </style>
 </head>
 <body class="min-h-screen flex flex-col">
+
+  <!-- Splashscreen: visibile 3 secondi, poi mostra la home -->
+  <div id="splashScreen" aria-hidden="true">
+    <img src="Splashscreen.png" alt="GesssAI-Pro" />
+  </div>
+  <script>
+    setTimeout(function () {
+      var el = document.getElementById("splashScreen");
+      if (!el) return;
+      el.classList.add("splash-hide");
+      setTimeout(function () { el.remove(); }, 700);
+    }, 3000);
+  </script>
 
   <!-- Layer decorativo tecnologico -->
   <div id="techBgLayer" aria-hidden="true"></div>
@@ -635,6 +667,14 @@
     function getTodayStr() {
       const d = new Date();
       return `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}/${d.getFullYear()}`;
+    }
+
+    function isPastDate(dateStr) {
+      const dm = String(dateStr || "").match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+      if (!dm) return false;
+      const d = new Date(+dm[3], +dm[2] - 1, +dm[1]);
+      const t = new Date(); t.setHours(0, 0, 0, 0);
+      return d < t;
     }
 
     function matchSortKey(m) {
@@ -971,11 +1011,37 @@
           away,
           date: formatExcelDate(row.Date),
           time: formatExcelTime(row.Time),
-          ftResult: null,
+          ftResult: (row.FTHG !== undefined && row.FTHG !== "" && row.FTAG !== undefined && row.FTAG !== "")
+            ? `${row.FTHG} - ${row.FTAG}` : null,
           bookOdds: extractBookOdds(row),
           isFixture: true
         };
       }).filter(x => x.div && x.home && x.away);
+
+      // Se una partita è presente sia nei risultati sia nelle future (già giocata ma
+      // ancora nel file fixtures), tengo una sola copia e le associo il risultato.
+      const dmyToTime = (str) => {
+        const m = String(str || "").match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+        return m ? Date.UTC(+m[3], +m[2] - 1, +m[1]) : null;
+      };
+      const resultsByKey = {};
+      for (const r of cleanResults) {
+        const k = `${r.div}|${r.home.toLowerCase()}|${r.away.toLowerCase()}`;
+        (resultsByKey[k] = resultsByKey[k] || []).push(r);
+      }
+      for (let i = cleanFixtures.length - 1; i >= 0; i--) {
+        const f = cleanFixtures[i];
+        const cands = resultsByKey[`${f.div}|${f.home.toLowerCase()}|${f.away.toLowerCase()}`] || [];
+        const ft = dmyToTime(f.date);
+        const hit = cands.find(r => {
+          const rt = dmyToTime(r.date);
+          return ft === null || rt === null || Math.abs(ft - rt) <= 5 * 86400000;
+        });
+        if (hit) {
+          if (!hit.ftResult && f.ftResult) hit.ftResult = f.ftResult;
+          cleanFixtures.splice(i, 1);
+        }
+      }
 
       const allItems = [...cleanResults, ...cleanFixtures];
       if (!allItems.length) return baseDemo;
@@ -1286,7 +1352,11 @@
                       <span class="ft-label">FT</span>
                       <span>${m.ftResult}</span>
                     </span>
-                  ` : ""}
+                  ` : (isPastDate(m.date) ? `
+                    <span class="match-result-badge" style="color:#fbbf24;border-color:rgba(251,191,36,0.45)">
+                      <span class="ft-label">Risultato in attesa di aggiornamento</span>
+                    </span>
+                  ` : "")}
                 </div>
               </div>
 
