@@ -680,6 +680,41 @@
     return result;
   };
 
+  // Tutte le giocate (con quota reale o equa) di una partita: usata dal generatore di schedine
+  const candCache = new WeakMap();
+  window.computeMatchCandidates = function (match, leagueCode, resultsRows) {
+    if (!match) return { real: [], dixon: [] };
+    let cache = null;
+    if (Array.isArray(resultsRows)) {
+      cache = candCache.get(resultsRows);
+      if (!cache) { cache = new Map(); candCache.set(resultsRows, cache); }
+      const hit = cache.get(`${leagueCode}|${match.id}`);
+      if (hit) return hit;
+    }
+    const homeHist = collectTeamHistoricalMatches(match.home, leagueCode, resultsRows);
+    const awayHist = collectTeamHistoricalMatches(match.away, leagueCode, resultsRows);
+    const hm = computeTeamMetrics(homeHist, 1.45, 1.05);
+    const am = computeTeamMetrics(awayHist, 1.25, 1.25);
+    const flat = (families) => {
+      const out = [];
+      for (const fam of families || []) {
+        const items = fam.items ? fam.items : [...(fam.overItems || []), ...(fam.underItems || [])];
+        for (const it of items) {
+          const odd = parseFloat(it.odd);
+          if (!Number.isFinite(odd) || odd <= 1) continue;
+          out.push({ label: it.label, pct: it.pct, odd, oddType: it.oddType, family: fam.title });
+        }
+      }
+      return out;
+    };
+    const result = {
+      real: flat(computeRealFamilies(match, homeHist, awayHist)),
+      dixon: flat(computeDixonColeFamilies(match, leagueCode, resultsRows, hm, am).families)
+    };
+    if (cache) cache.set(`${leagueCode}|${match.id}`, result);
+    return result;
+  };
+
   function computeLeagueStandings(match, leagueCode, resultsRows, fixturesRows) {
     const divTarget = String(leagueCode || "").trim().toUpperCase();
     const endOfToday = getEndOfTodayUtc();
