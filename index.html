@@ -482,7 +482,7 @@
             <span class="text-[11px] uppercase tracking-wider px-2 py-0.5 rounded-full bg-cyan-500/15 text-cyan-300 border border-cyan-500/30">
               Europa 2026/27
             </span>
-            <span id="appVersion" class="text-[10px] text-slate-500">build 9</span>
+            <span id="appVersion" class="text-[10px] text-slate-500">build 10</span>
           </div>
           <p id="dataStatusText" class="text-xs text-slate-400">Inizializzazione dati in corso...</p>
         </div>
@@ -772,6 +772,9 @@
     function toggleViewMode() {
       state.viewMode = state.viewMode === "form" ? "chrono" : "form";
       renderMatches();
+      if (window.cgCheckModule && typeof window.cgCheckModule.decorate === "function") {
+        window.cgCheckModule.decorate();
+      }
     }
 
     function updateViewSwitchUI() {
@@ -1395,19 +1398,22 @@
       }).join("");
     }
 
-    function renderPickBox(title, picks) {
+    function renderPickBox(title, picks, boxType) {
       const body = (picks && picks.length)
         ? picks.map(pk => `
-            <div class="flex items-center gap-1 text-xs whitespace-nowrap leading-snug">
-              <span class="font-extrabold text-white">${pk.label}:</span>
-              ${renderPctText(pk.pct)}
+            <div class="cg-pick-row flex items-center justify-between gap-1.5 text-xs whitespace-nowrap leading-snug" data-pick-label="${String(pk.label || "").replace(/"/g, "&quot;")}">
+              <span class="inline-flex items-center gap-1">
+                <span class="font-extrabold text-white">${pk.label}:</span>
+                ${renderPctText(pk.pct)}
+              </span>
+              <span class="cg-check-dot text-xs leading-none" title="In attesa del check">🟡</span>
             </div>
           `).join("")
         : `<div class="text-sm text-slate-500 py-2">—</div>`;
       return `
-        <div class="px-3 py-1.5 rounded-xl bg-slate-900/90 border border-slate-700/80 min-w-[118px]">
+        <div class="cg-pick-box cg-pick-box-${boxType} px-3 py-1.5 rounded-xl bg-slate-900/90 border border-slate-700/80 min-w-[128px]">
           <div class="text-[10px] uppercase tracking-wider text-cyan-300 font-semibold text-center mb-1 border-b border-slate-700/70 pb-0.5">${title}</div>
-          <div class="space-y-0.5">${body}</div>
+          <div class="cg-pick-rows space-y-0.5">${body}</div>
         </div>
       `;
     }
@@ -1512,8 +1518,8 @@
                   <div class="text-sm mt-0.5">${renderPctText(m.diffForm)}</div>
                 </div>
 
-                ${renderPickBox("Reali", picks.real)}
-                ${renderPickBox("Dixon-Cole", picks.dixon)}
+                ${renderPickBox("Reali", picks.real, "real")}
+                ${renderPickBox("Dixon-Cole", picks.dixon, "dixon")}
               </div>
             </div>
           </div>
@@ -1779,14 +1785,15 @@
         const cards = document.querySelectorAll("#matchesList > [role='button']");
         cards.forEach((cardEl, idx) => {
           const m = matches[idx];
-          if (!m || !m.ftResult) return;
-          const score = parseScore(m.ftResult);
-          if (!score) return;
+          if (!m) return;
+
+          const score = m.ftResult ? parseScore(m.ftResult) : null;
           const snap = checkState.snapshots[makeMatchKey(state.selectedLeagueCode, m)];
-          if (!snap) return;
+          const canCheck = Boolean(score && snap);
 
           const toMap = (arr) => {
             const map = new Map();
+            if (!canCheck) return map;
             for (const p of (arr || [])) {
               const res = evaluateSingleLeg(p.label, score);
               if (typeof res === "boolean") map.set(p.label.trim().toLowerCase(), res);
@@ -1794,29 +1801,36 @@
             return map;
           };
 
-          const realMap = toMap(snap.picks?.real);
-          const dixonMap = toMap(snap.picks?.dixon);
+          const realMap = toMap(snap?.picks?.real);
+          const dixonMap = toMap(snap?.picks?.dixon);
 
-          const boxes = cardEl.querySelectorAll(".px-3.py-1\\.5.rounded-xl.bg-slate-900\\/90.border.border-slate-700\\/80.min-w-\\[118px\\]");
-          if (boxes.length >= 2) {
-            [boxes[0], boxes[1]].forEach((box, boxIdx) => {
-              const activeMap = boxIdx === 0 ? realMap : dixonMap;
-              const rows = box.querySelectorAll(".space-y-0\\.5 > div");
-              rows.forEach(rowEl => {
-                if (rowEl.querySelector(".cg-check-dot")) return;
-                const firstSpan = rowEl.querySelector("span");
-                if (!firstSpan) return;
-                const rawLabel = firstSpan.textContent.replace(/:$/, "").trim().toLowerCase();
-                if (!activeMap.has(rawLabel)) return;
+          const realBox = cardEl.querySelector(".cg-pick-box-real");
+          const dixonBox = cardEl.querySelector(".cg-pick-box-dixon");
+
+          [
+            { box: realBox, activeMap: realMap },
+            { box: dixonBox, activeMap: dixonMap }
+          ].forEach(({ box, activeMap }) => {
+            if (!box) return;
+            const rows = box.querySelectorAll(".cg-pick-row");
+            rows.forEach(rowEl => {
+              let dot = rowEl.querySelector(".cg-check-dot");
+              if (!dot) {
+                dot = document.createElement("span");
+                dot.className = "cg-check-dot text-xs leading-none";
+                rowEl.appendChild(dot);
+              }
+              const rawLabel = (rowEl.getAttribute("data-pick-label") || "").trim().toLowerCase();
+              if (canCheck && activeMap.has(rawLabel)) {
                 const won = activeMap.get(rawLabel);
-                const dot = document.createElement("span");
-                dot.className = "cg-check-dot ml-1 text-xs leading-none";
                 dot.textContent = won ? "🟢" : "🔴";
                 dot.title = won ? "Presa" : "Sbagliata";
-                rowEl.appendChild(dot);
-              });
+              } else {
+                dot.textContent = "🟡";
+                dot.title = "In attesa del check";
+              }
             });
-          }
+          });
         });
       }
 
