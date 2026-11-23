@@ -101,7 +101,6 @@
       animation: cgBombBounce 1.1s infinite ease-in-out;
     }
 
-
     /* Interruttore doppia visualizzazione */
     .view-switch {
       position: relative;
@@ -160,7 +159,6 @@
       position: relative;
     }
 
-    /* griglia tecnologica */
     body::before {
       content: "";
       position: fixed;
@@ -177,7 +175,6 @@
       mask-image: radial-gradient(ellipse at 50% 30%, #000 25%, transparent 80%);
     }
 
-    /* alone luminoso che si muove lentamente */
     body::after {
       content: "";
       position: fixed;
@@ -195,7 +192,6 @@
       100% { transform: translate(70vw, 35vh) scale(1.15); }
     }
 
-    /* ===== NUOVO layer circuiti + scanline ===== */
     #techBgLayer {
       position: fixed;
       inset: 0;
@@ -236,7 +232,6 @@
       100% { background-position: 220px 220px, -280px 280px, 180px -180px, -240px -240px; }
     }
 
-    /* scanline orizzontale che scorre */
     #techBgLayer .cgScanline {
       position: absolute;
       left: 0; right: 0;
@@ -273,7 +268,6 @@
       filter: drop-shadow(0 0 8px rgba(34, 211, 238, 0.45));
     }
 
-    /* Header */
     header {
       background: linear-gradient(180deg, rgba(2, 10, 28, 0.92), rgba(4, 22, 48, 0.78)) !important;
       border-bottom: 1px solid rgba(34, 211, 238, 0.30) !important;
@@ -286,7 +280,6 @@
     }
     #liveClockDate { color: #7dd3fc; }
 
-    /* Card in vetro con angoli HUD */
     .glass-card {
       position: relative;
       background: linear-gradient(180deg, rgba(9, 32, 64, 0.70) 0%, rgba(4, 16, 38, 0.82) 100%);
@@ -319,7 +312,6 @@
       box-shadow: inset 0 1px 0 rgba(165, 243, 252, 0.12), 0 0 26px rgba(34, 211, 238, 0.20);
     }
 
-    /* Sfondi/bordi/testi "slate" -> blu notte con riflessi ciano */
     [class^="bg-slate-950"], [class*=" bg-slate-950"] { background-color: rgba(2, 12, 30, 0.80) !important; }
     [class^="bg-slate-900"], [class*=" bg-slate-900"] { background-color: rgba(7, 26, 54, 0.72) !important; }
     [class^="bg-slate-800"], [class*=" bg-slate-800"] { background-color: rgba(10, 38, 74, 0.80) !important; }
@@ -336,7 +328,6 @@
     .text-slate-500 { color: #5f8db3 !important; }
     .text-slate-600 { color: #3f6c92 !important; }
 
-    /* Pulsanti principali */
     .bg-cyan-600 {
       background-image: linear-gradient(135deg, #0891b2, #2563eb) !important;
       box-shadow: 0 0 16px rgba(34, 211, 238, 0.28);
@@ -349,7 +340,6 @@
       box-shadow: inset 0 0 14px rgba(34, 211, 238, 0.10);
     }
 
-    /* Partite di oggi: card riempita di ciano ghiaccio tenue */
     .today-match {
       background: linear-gradient(180deg, rgba(165, 243, 252, 0.22) 0%, rgba(103, 232, 249, 0.10) 100%) !important;
       border-color: rgba(165, 243, 252, 0.45) !important;
@@ -359,7 +349,6 @@
       background: linear-gradient(180deg, rgba(165, 243, 252, 0.30) 0%, rgba(103, 232, 249, 0.16) 100%) !important;
     }
 
-    /* Card partita già giocata: sfondo grigio */
     .match-played {
       background: linear-gradient(180deg, #5b6677 0%, #475264 100%) !important;
       border-color: rgba(203, 213, 225, 0.55) !important;
@@ -369,7 +358,6 @@
       background: linear-gradient(180deg, #667286 0%, #536076 100%) !important;
       border-color: rgba(226, 232, 240, 0.70) !important;
     }
-    /* Riquadro risultato in evidenza */
     .match-result-badge {
       display: inline-flex;
       align-items: center;
@@ -396,7 +384,6 @@
     ::-webkit-scrollbar-track { background: #04112a; }
     ::-webkit-scrollbar-thumb { background: linear-gradient(180deg, #0e7490, #1d4ed8); border-radius: 999px; }
 
-    /* Splashscreen iniziale */
     #splashScreen {
       position: fixed; inset: 0; z-index: 99999;
       display: flex; align-items: center; justify-content: center;
@@ -415,7 +402,6 @@
       to   { opacity: 1; transform: scale(1); }
     }
 
-    /* ===== PWA / mobile / tablet ===== */
     html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
     body {
       -webkit-tap-highlight-color: transparent;
@@ -432,7 +418,6 @@
       .view-switch { min-height: 24px; }
     }
 
-    /* Telefono e tablet verticale: nazioni e campionati come righe scorrevoli */
     @media (max-width: 1023px) {
       #countriesList, #leaguesList {
         display: flex !important; flex-direction: row; gap: 8px;
@@ -448,11 +433,9 @@
       #leaguesList > button { min-width: 180px; }
       main { gap: 16px !important; padding-top: 12px !important; padding-bottom: 24px !important; }
     }
-    /* Tablet: header piu' arioso, card su una colonna comoda */
     @media (min-width: 640px) and (max-width: 1023px) {
       #leaguesList > button { min-width: 220px; }
     }
-    /* Telefono */
     @media (max-width: 767px) {
       header { position: static !important; }
       header h1 { font-size: 1.1rem !important; }
@@ -499,26 +482,29 @@
             <span class="text-[11px] uppercase tracking-wider px-2 py-0.5 rounded-full bg-cyan-500/15 text-cyan-300 border border-cyan-500/30">
               Europa 2026/27
             </span>
-            <span id="appVersion" class="text-[10px] text-slate-500">build 8</span>
+            <span id="appVersion" class="text-[10px] text-slate-500">build 9</span>
           </div>
           <p id="dataStatusText" class="text-xs text-slate-400">Inizializzazione dati in corso...</p>
         </div>
       </div>
 
       <div class="flex flex-col items-end gap-2 ml-auto">
-      <div id="liveClock" class="text-right leading-tight">
-        <div id="liveClockDate" class="text-[11px] uppercase tracking-wider text-slate-400"></div>
-        <div id="liveClockTime" class="text-lg font-extrabold text-cyan-300 tabular-nums"></div>
-      </div>
-      <div class="flex items-center gap-2">
-        <button id="reloadDataBtn" type="button" onclick="autoLoadComboGesssData(true)" class="px-3 py-2 rounded-lg text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition">
-          🔄 Aggiorna Dati
-        </button>
-        <label class="px-3 py-2 rounded-lg text-xs font-semibold bg-cyan-600 hover:bg-cyan-500 text-white cursor-pointer transition">
-          📥 Carica Excel/CSV
-          <input id="manualFileInput" type="file" accept=".xlsx,.xls,.csv" multiple class="hidden" onchange="handleManualUpload(event)" />
-        </label>
-      </div>
+        <div id="liveClock" class="text-right leading-tight">
+          <div id="liveClockDate" class="text-[11px] uppercase tracking-wider text-slate-400"></div>
+          <div id="liveClockTime" class="text-lg font-extrabold text-cyan-300 tabular-nums"></div>
+        </div>
+        <div class="flex items-center gap-2">
+          <button id="openCheckBtn" type="button" onclick="toggleCheckView(true)" class="px-3 py-2 rounded-lg text-xs font-semibold bg-emerald-600/20 hover:bg-emerald-500/30 text-emerald-200 border border-emerald-400/40 transition">
+            ✅ Check
+          </button>
+          <button id="reloadDataBtn" type="button" onclick="autoLoadComboGesssData(true)" class="px-3 py-2 rounded-lg text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition">
+            🔄 Aggiorna Dati
+          </button>
+          <label class="px-3 py-2 rounded-lg text-xs font-semibold bg-cyan-600 hover:bg-cyan-500 text-white cursor-pointer transition">
+            📥 Carica Excel/CSV
+            <input id="manualFileInput" type="file" accept=".xlsx,.xls,.csv" multiple class="hidden" onchange="handleManualUpload(event)" />
+          </label>
+        </div>
       </div>
     </div>
   </header>
@@ -576,6 +562,41 @@
       <div id="matchesList" class="space-y-2.5"></div>
     </section>
   </main>
+
+  <!-- Sezione Check: Riepilogo giocate per campionato -->
+  <section id="checkSection" class="hidden max-w-[1700px] w-full mx-auto px-4 py-6 flex-1 space-y-5 relative z-10">
+    <div class="glass-card rounded-2xl p-4 flex flex-wrap items-center justify-between gap-3">
+      <div>
+        <h2 class="text-lg font-extrabold text-white">✅ Check — Riepilogo per Campionato</h2>
+        <p class="text-xs text-slate-400 mt-0.5">
+          Conteggio di tutte le giocate salvate prima del match (Reali e Dixon-Cole, incluse combo) rispetto ai risultati reali
+        </p>
+      </div>
+      <div class="flex flex-wrap items-center gap-2">
+        <label class="text-xs text-slate-300 flex items-center gap-1.5 bg-slate-900/90 px-3 py-1.5 rounded-lg border border-slate-700">
+          <span>% minima:</span>
+          <select id="checkMinPctSelect" onchange="setCheckMinPct(this.value)" class="bg-transparent font-bold text-cyan-300">
+            <option value="0">Tutte (0%+)</option>
+            <option value="50">50%+</option>
+            <option value="60">60%+</option>
+            <option value="65">65%+</option>
+            <option value="70">70%+</option>
+            <option value="75">75%+</option>
+            <option value="80">80%+</option>
+          </select>
+        </label>
+        <button type="button" onclick="downloadCheckSnapshotsJson()" class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-cyan-600 hover:bg-cyan-500 text-white transition">
+          💾 Esporta check_snapshots.json
+        </button>
+        <button type="button" onclick="toggleCheckView(false)" class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition">
+          ⬅ Torna al Palinsesto
+        </button>
+      </div>
+    </div>
+
+    <div id="checkSummaryCards" class="grid grid-cols-1 md:grid-cols-3 gap-3"></div>
+    <div id="checkLeaguesContainer" class="space-y-3"></div>
+  </section>
 
   <script>
     const NATIONS = [
@@ -723,7 +744,7 @@
       resultsRows: [],
       fixturesRows: [],
       roundsByLeague: {},
-      viewMode: "form" // "form" = differenza forma decrescente, "chrono" = cronologico crescente
+      viewMode: "form"
     };
 
     function getTodayStr() {
@@ -775,7 +796,6 @@
       if (timeEl) {
         timeEl.textContent = now.toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
       }
-      // A cambio giorno aggiorna i bordi verdi
       const today = getTodayStr();
       if (today !== lastClockDay) {
         lastClockDay = today;
@@ -834,7 +854,6 @@
       `;
     }
 
-    // Normalizza sempre in DD/MM/AAAA (gestendo DD/MM/AAAA, MM/GG/AAAA, AAAA-MM-GG, Date e seriali Excel)
     function formatExcelDate(val) {
       if (val === null || val === undefined || val === "") return "";
 
@@ -864,7 +883,6 @@
 
       const datePart = str.split(/[\sT]+/)[0];
 
-      // AAAA-MM-GG oppure AAAA/MM/GG
       const ymd = datePart.match(/^(\d{4})[\/\-.](\d{1,2})[\/\-.](\d{1,2})$/);
       if (ymd) {
         const yyyy = ymd[1];
@@ -873,7 +891,6 @@
         return `${dd}/${mm}/${yyyy}`;
       }
 
-      // Coppie a due separatori: riconosce sia DD/MM/AAAA che MM/GG/AAAA (es. 11/22/2026 -> 22/11/2026)
       const parts = datePart.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4})$/);
       if (parts) {
         const p1 = parseInt(parts[1], 10);
@@ -1002,7 +1019,7 @@
                 id: `${lg.code}-R${r}-${m}`,
                 home,
                 away,
-                date: "22/11/2026",
+                date: "23/11/2026",
                 time: m < 5 ? "15:00" : "18:00",
                 ftResult: r === 1 ? `${(m + 1) % 3} - ${m % 2}` : null,
                 homeFormArr,
@@ -1080,8 +1097,6 @@
         };
       }).filter(x => x.div && x.home && x.away);
 
-      // Se una partita è presente sia nei risultati sia nelle future (già giocata ma
-      // ancora nel file fixtures), tengo una sola copia e le associo il risultato.
       const dmyToTime = (str) => {
         const m = String(str || "").match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
         return m ? Date.UTC(+m[3], +m[2] - 1, +m[1]) : null;
@@ -1170,7 +1185,6 @@
       return finalRounds;
     }
 
-    // Cache locale su IndexedDB (localStorage ha un limite di ~5 MB e il CSV lo supera)
     const cgDB = (() => {
       let dbPromise = null;
       const open = () => dbPromise || (dbPromise = new Promise((resolve, reject) => {
@@ -1202,7 +1216,6 @@
         }
       };
     })();
-    // pulizia della vecchia cache che saturava localStorage
     try { localStorage.removeItem("combogesss_results"); localStorage.removeItem("combogesss_fixtures"); } catch (_) {}
 
     async function autoLoadComboGesssData(forceReload = false) {
@@ -1269,10 +1282,9 @@
         statusEl.textContent = "Anteprima dati (esegui update_combogesss_data.py o carica Excel/CSV)";
       }
 
-      renderAll();
+      await renderAll();
     }
 
-    // Unisce righe risultati evitando doppioni: stessa Div + data + squadre => vale la riga più nuova
     function mergeResultRows(oldRows, newRows) {
       const keyOf = (r) => [
         String(r.Div || r.DivCode || "").trim().toUpperCase(),
@@ -1318,7 +1330,7 @@
       state.roundsByLeague = organizeMatchesIntoRounds(state.resultsRows, state.fixturesRows);
       document.getElementById("dataStatusText").textContent =
         `Importati ${files.length} file (${state.resultsRows.length} risultati • ${state.fixturesRows.length} future)`;
-      renderAll();
+      await renderAll();
     }
 
     function renderCountries() {
@@ -1448,7 +1460,6 @@
         const isDiffBomb = clampPct(m.diffForm) >= 90;
         const isToday = m.date === todayStr;
         const hasResult = !!m.ftResult;
-        // grigia se ha il risultato oppure se la data è antecedente a oggi
         const isPlayed = hasResult || isPastDate(m.date);
         const picks = (typeof window.computeMatchTopPicks === "function")
           ? window.computeMatchTopPicks(m, state.selectedLeagueCode, state.resultsRows)
@@ -1484,7 +1495,6 @@
                 </div>
               </div>
 
-              <!-- Stato di forma ultime 5 partite + Differenza positiva -->
               <div class="flex items-center gap-3 flex-wrap">
                 <div class="text-left">
                   <div class="text-[10px] uppercase tracking-wider text-slate-400">Stato di forma (ult. 5)</div>
@@ -1561,6 +1571,9 @@
     function selectRound(roundNum) {
       state.selectedRound = Number(roundNum);
       renderMatches();
+      if (window.cgCheckModule && typeof window.cgCheckModule.decorate === "function") {
+        window.cgCheckModule.decorate();
+      }
     }
 
     function changeRound(delta) {
@@ -1570,21 +1583,412 @@
       const nextIdx = Math.max(0, Math.min(rounds.length - 1, idx + delta));
       state.selectedRound = rounds[nextIdx].roundNumber;
       renderMatches();
+      if (window.cgCheckModule && typeof window.cgCheckModule.decorate === "function") {
+        window.cgCheckModule.decorate();
+      }
     }
 
-    function renderAll() {
+    async function renderAll() {
       renderCountries();
       renderLeagues();
       renderMatches();
+      if (window.cgCheckModule && typeof window.cgCheckModule.onRender === "function") {
+        await window.cgCheckModule.onRender();
+      }
     }
 
-    window.addEventListener("DOMContentLoaded", () => {
-      updateClock();
-      setInterval(updateClock, 1000);
-      autoLoadComboGesssData();
-    });
+    (function initCheckFeature() {
+      const CHECK_KEY = "combogesss_check_snapshots_v1";
+      const GITHUB_CHECK_PATH = "./data/check_snapshots.json";
 
-    // scanline dinamica per il layer tecnologico
+      const checkState = {
+        isOpen: false,
+        minPct: 0,
+        snapshots: {}
+      };
+
+      function makeMatchKey(leagueCode, m) {
+        const d = formatExcelDate(m.date || "");
+        const h = String(m.home || "").trim().toLowerCase();
+        const a = String(m.away || "").trim().toLowerCase();
+        return `${String(leagueCode || "").toUpperCase()}|${d}|${h}|${a}`;
+      }
+
+      function parseScore(ftResult) {
+        if (!ftResult) return null;
+        const m = String(ftResult).trim().match(/(\d+)\s*[-:]\s*(\d+)/);
+        if (!m) return null;
+        return { hg: parseInt(m[1], 10), ag: parseInt(m[2], 10) };
+      }
+
+      function evaluateSingleLeg(label, score) {
+        const { hg, ag } = score;
+        const total = hg + ag;
+        const clean = String(label || "").trim().toUpperCase().replace(/\s+/g, " ");
+
+        if (clean.includes(" + ") || clean.includes(" & ")) {
+          const parts = clean.split(/\s*(?:\+|&)\s*/).filter(Boolean);
+          if (!parts.length) return null;
+          const results = parts.map(p => evaluateSingleLeg(p, score));
+          if (results.some(r => r === null)) return null;
+          return results.every(Boolean);
+        }
+
+        if (clean === "1") return hg > ag;
+        if (clean === "X") return hg === ag;
+        if (clean === "2") return ag > hg;
+        if (clean === "1X") return hg >= ag;
+        if (clean === "X2") return ag >= hg;
+        if (clean === "12") return hg !== ag;
+
+        if (clean === "GG" || clean === "GOL") return hg > 0 && ag > 0;
+        if (clean === "NG" || clean === "NOGOL" || clean === "NO GOL") return hg === 0 || ag === 0;
+
+        const ouMatch = clean.match(/^(OVER|UNDER|OV|UN)\s*([0-9]+(?:[.,][0-9]+)?)$/);
+        if (ouMatch) {
+          const kind = ouMatch[1];
+          const line = parseFloat(ouMatch[2].replace(",", "."));
+          if (!Number.isFinite(line)) return null;
+          return (kind === "OVER" || kind === "OV") ? total > line : total < line;
+        }
+
+        const mgMatch = clean.match(/^(?:MULTIGOL|MG)\s*(\d+)\s*[-–]\s*(\d+)$/);
+        if (mgMatch) {
+          const minG = parseInt(mgMatch[1], 10);
+          const maxG = parseInt(mgMatch[2], 10);
+          return total >= minG && total <= maxG;
+        }
+
+        return null;
+      }
+
+      function extractCardPicks(match, leagueCode) {
+        const raw = (typeof window.computeMatchTopPicks === "function")
+          ? window.computeMatchTopPicks(match, leagueCode, state.resultsRows)
+          : { real: [], dixon: [] };
+
+        const normList = (arr, sourceType) => (arr || []).map(item => ({
+          source: sourceType,
+          label: String(item.label || "").trim(),
+          pct: clampPct(item.pct),
+          odd: item.odd ?? item.quota ?? null,
+          oddType: item.oddType || (sourceType === "real" ? "reale" : "equa")
+        }));
+
+        return {
+          real: normList(raw.real, "real"),
+          dixon: normList(raw.dixon, "dixon")
+        };
+      }
+
+      async function persistSnapshotsLocal() {
+        await cgDB.set(CHECK_KEY, {
+          version: 1,
+          updatedAt: new Date().toISOString(),
+          minPctFilter: checkState.minPct,
+          snapshots: checkState.snapshots
+        });
+      }
+
+      async function loadSnapshotsFromStorageAndGitHub() {
+        let localData = null;
+        try { localData = await cgDB.get(CHECK_KEY); } catch (_) {}
+
+        let ghData = null;
+        try {
+          const resp = await fetch(`${GITHUB_CHECK_PATH}?t=${Date.now()}`, { cache: "no-store" });
+          if (resp.ok) ghData = await resp.json();
+        } catch (_) {}
+
+        const ghSnaps = (ghData && ghData.snapshots && typeof ghData.snapshots === "object") ? ghData.snapshots : {};
+        const locSnaps = (localData && localData.snapshots && typeof localData.snapshots === "object") ? localData.snapshots : {};
+
+        const merged = { ...ghSnaps };
+        for (const [k, locItem] of Object.entries(locSnaps)) {
+          const existing = merged[k];
+          if (!existing) merged[k] = locItem;
+          else if (locItem.frozen && !existing.frozen) merged[k] = locItem;
+          else if ((locItem.updatedAt || "") >= (existing.updatedAt || "")) merged[k] = locItem;
+        }
+
+        checkState.snapshots = merged;
+        if (typeof localData?.minPctFilter === "number") checkState.minPct = localData.minPctFilter;
+        else if (typeof ghData?.minPctFilter === "number") checkState.minPct = ghData.minPctFilter;
+
+        await persistSnapshotsLocal();
+      }
+
+      async function syncSnapshotsWithRounds() {
+        if (!state.roundsByLeague) return;
+        let changed = false;
+        const nowIso = new Date().toISOString();
+
+        for (const [leagueCode, rounds] of Object.entries(state.roundsByLeague)) {
+          const meta = getLeagueMeta(leagueCode);
+          for (const r of (rounds || [])) {
+            for (const m of (r.matches || [])) {
+              const key = makeMatchKey(leagueCode, m);
+              const hasResult = Boolean(m.ftResult && parseScore(m.ftResult));
+              const existing = checkState.snapshots[key];
+
+              if (hasResult) {
+                if (existing && !existing.frozen) {
+                  existing.frozen = true;
+                  existing.ftResult = m.ftResult;
+                  existing.frozenAt = nowIso;
+                  existing.updatedAt = nowIso;
+                  changed = true;
+                }
+                continue;
+              }
+
+              if (!existing || !existing.frozen) {
+                const picks = extractCardPicks(m, leagueCode);
+                checkState.snapshots[key] = {
+                  key,
+                  leagueCode,
+                  leagueName: meta.name,
+                  country: meta.country,
+                  date: m.date || "",
+                  time: m.time || "",
+                  home: m.home,
+                  away: m.away,
+                  ftResult: null,
+                  frozen: false,
+                  picks,
+                  updatedAt: nowIso
+                };
+                changed = true;
+              }
+            }
+          }
+        }
+
+        if (changed) await persistSnapshotsLocal();
+      }
+
+      function decoratePickBoxesWithDots() {
+        const rounds = state.roundsByLeague[state.selectedLeagueCode] || [];
+        const roundObj = rounds.find(r => r.roundNumber === state.selectedRound) || rounds[0];
+        if (!roundObj) return;
+
+        let matches = [...roundObj.matches];
+        if (state.viewMode === "chrono") matches.sort((a, b) => matchSortKey(a) - matchSortKey(b));
+        else matches.sort((a, b) => b.diffForm - a.diffForm);
+
+        const cards = document.querySelectorAll("#matchesList > [role='button']");
+        cards.forEach((cardEl, idx) => {
+          const m = matches[idx];
+          if (!m || !m.ftResult) return;
+          const score = parseScore(m.ftResult);
+          if (!score) return;
+          const snap = checkState.snapshots[makeMatchKey(state.selectedLeagueCode, m)];
+          if (!snap) return;
+
+          const toMap = (arr) => {
+            const map = new Map();
+            for (const p of (arr || [])) {
+              const res = evaluateSingleLeg(p.label, score);
+              if (typeof res === "boolean") map.set(p.label.trim().toLowerCase(), res);
+            }
+            return map;
+          };
+
+          const realMap = toMap(snap.picks?.real);
+          const dixonMap = toMap(snap.picks?.dixon);
+
+          const boxes = cardEl.querySelectorAll(".px-3.py-1\\.5.rounded-xl.bg-slate-900\\/90.border.border-slate-700\\/80.min-w-\\[118px\\]");
+          if (boxes.length >= 2) {
+            [boxes[0], boxes[1]].forEach((box, boxIdx) => {
+              const activeMap = boxIdx === 0 ? realMap : dixonMap;
+              const rows = box.querySelectorAll(".space-y-0\\.5 > div");
+              rows.forEach(rowEl => {
+                if (rowEl.querySelector(".cg-check-dot")) return;
+                const firstSpan = rowEl.querySelector("span");
+                if (!firstSpan) return;
+                const rawLabel = firstSpan.textContent.replace(/:$/, "").trim().toLowerCase();
+                if (!activeMap.has(rawLabel)) return;
+                const won = activeMap.get(rawLabel);
+                const dot = document.createElement("span");
+                dot.className = "cg-check-dot ml-1 text-xs leading-none";
+                dot.textContent = won ? "🟢" : "🔴";
+                dot.title = won ? "Presa" : "Sbagliata";
+                rowEl.appendChild(dot);
+              });
+            });
+          }
+        });
+      }
+
+      function computeStatsByLeague(minPct) {
+        const byLeague = {};
+        for (const snap of Object.values(checkState.snapshots)) {
+          const score = parseScore(snap.ftResult);
+          if (!score) continue;
+
+          const lgCode = snap.leagueCode;
+          if (!byLeague[lgCode]) {
+            const meta = getLeagueMeta(lgCode);
+            byLeague[lgCode] = {
+              leagueCode: lgCode,
+              leagueName: snap.leagueName || meta.name,
+              country: snap.country || meta.country,
+              real: { won: 0, estSum: 0, count: 0 },
+              dixon: { won: 0, estSum: 0, count: 0 }
+            };
+          }
+
+          const bucket = byLeague[lgCode];
+          for (const src of ["real", "dixon"]) {
+            for (const p of (snap.picks?.[src] || [])) {
+              const pct = clampPct(p.pct);
+              if (pct < minPct) continue;
+              const won = evaluateSingleLeg(p.label, score);
+              if (typeof won !== "boolean") continue;
+              bucket[src].count += 1;
+              bucket[src].estSum += pct;
+              if (won) bucket[src].won += 1;
+            }
+          }
+        }
+        return Object.values(byLeague).sort((a, b) => a.leagueName.localeCompare(b.leagueName, "it"));
+      }
+
+      function renderCheckPage() {
+        const sel = document.getElementById("checkMinPctSelect");
+        if (sel) sel.value = String(checkState.minPct);
+
+        const rows = computeStatsByLeague(checkState.minPct);
+        const rWon = rows.reduce((s, r) => s + r.real.won, 0);
+        const rCnt = rows.reduce((s, r) => s + r.real.count, 0);
+        const rEst = rows.reduce((s, r) => s + r.real.estSum, 0);
+
+        const dWon = rows.reduce((s, r) => s + r.dixon.won, 0);
+        const dCnt = rows.reduce((s, r) => s + r.dixon.count, 0);
+        const dEst = rows.reduce((s, r) => s + r.dixon.estSum, 0);
+
+        const tWon = rWon + dWon;
+        const tCnt = rCnt + dCnt;
+        const tEst = rEst + dEst;
+
+        const fmtRate = (w, c) => c > 0 ? formatPct((w / c) * 100) : "—";
+        const fmtAvg = (sum, c) => c > 0 ? formatPct(sum / c) : "—";
+
+        const cardsEl = document.getElementById("checkSummaryCards");
+        if (cardsEl) {
+          cardsEl.innerHTML = `
+            <div class="glass-card rounded-xl p-4">
+              <div class="text-xs uppercase tracking-wider text-cyan-300 font-bold">Totale Generale</div>
+              <div class="text-2xl font-extrabold text-white mt-1">${tWon}/${tCnt} <span class="text-base text-emerald-400">(${fmtRate(tWon, tCnt)})</span></div>
+              <div class="text-xs text-slate-400 mt-1">Media stimata modelli: <span class="text-cyan-200 font-semibold">${fmtAvg(tEst, tCnt)}</span></div>
+            </div>
+            <div class="glass-card rounded-xl p-4">
+              <div class="text-xs uppercase tracking-wider text-cyan-300 font-bold">Giocate Reali</div>
+              <div class="text-2xl font-extrabold text-white mt-1">${rWon}/${rCnt} <span class="text-base text-emerald-400">(${fmtRate(rWon, rCnt)})</span></div>
+              <div class="text-xs text-slate-400 mt-1">Media stimata: <span class="text-cyan-200 font-semibold">${fmtAvg(rEst, rCnt)}</span></div>
+            </div>
+            <div class="glass-card rounded-xl p-4">
+              <div class="text-xs uppercase tracking-wider text-cyan-300 font-bold">Dixon-Cole</div>
+              <div class="text-2xl font-extrabold text-white mt-1">${dWon}/${dCnt} <span class="text-base text-emerald-400">(${fmtRate(dWon, dCnt)})</span></div>
+              <div class="text-xs text-slate-400 mt-1">Media stimata: <span class="text-cyan-200 font-semibold">${fmtAvg(dEst, dCnt)}</span></div>
+            </div>
+          `;
+        }
+
+        const listEl = document.getElementById("checkLeaguesContainer");
+        if (!listEl) return;
+
+        if (!rows.length) {
+          listEl.innerHTML = `<div class="glass-card rounded-xl p-6 text-center text-sm text-slate-400">
+            Nessuna partita con risultato finale verificabile al momento. Gli snapshot delle partite non ancora giocate vengono salvati automaticamente e congelati appena carichi i risultati nell'Excel.
+          </div>`;
+          return;
+        }
+
+        listEl.innerHTML = rows.map(r => {
+          const rLost = r.real.count - r.real.won;
+          const dLost = r.dixon.count - r.dixon.won;
+          const lWon = r.real.won + r.dixon.won;
+          const lCnt = r.real.count + r.dixon.count;
+          const lLost = lCnt - lWon;
+          const lEst = r.real.estSum + r.dixon.estSum;
+
+          return `
+            <div class="glass-card rounded-xl p-4 space-y-2">
+              <div class="flex flex-wrap items-center justify-between gap-2">
+                <div class="font-bold text-white text-base">${r.leagueName} <span class="text-xs font-normal text-slate-400">(${r.country})</span></div>
+                <div class="text-xs font-semibold text-slate-200">
+                  Totale: 🟢 ${lWon} • 🔴 ${lLost} (${fmtRate(lWon, lCnt)}) • Stima media: <span class="text-cyan-300">${fmtAvg(lEst, lCnt)}</span>
+                </div>
+              </div>
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs pt-1 border-t border-slate-800/80">
+                <div class="bg-slate-900/70 rounded-lg p-2.5 border border-slate-800">
+                  <span class="font-bold text-cyan-300">Reali:</span>
+                  🟢 ${r.real.won} / 🔴 ${rLost} (${fmtRate(r.real.won, r.real.count)}) — Stima media: <span class="font-semibold text-white">${fmtAvg(r.real.estSum, r.real.count)}</span>
+                </div>
+                <div class="bg-slate-900/70 rounded-lg p-2.5 border border-slate-800">
+                  <span class="font-bold text-cyan-300">Dixon-Cole:</span>
+                  🟢 ${r.dixon.won} / 🔴 ${dLost} (${fmtRate(r.dixon.won, r.dixon.count)}) — Stima media: <span class="font-semibold text-white">${fmtAvg(r.dixon.estSum, r.dixon.count)}</span>
+                </div>
+              </div>
+            </div>
+          `;
+        }).join("");
+      }
+
+      window.toggleCheckView = function (open) {
+        checkState.isOpen = typeof open === "boolean" ? open : !checkState.isOpen;
+        const mainEl = document.querySelector("main");
+        const checkEl = document.getElementById("checkSection");
+        if (mainEl) mainEl.classList.toggle("hidden", checkState.isOpen);
+        if (checkEl) checkEl.classList.toggle("hidden", !checkState.isOpen);
+        if (checkState.isOpen) renderCheckPage();
+      };
+
+      window.setCheckMinPct = async function (val) {
+        checkState.minPct = Number(val) || 0;
+        await persistSnapshotsLocal();
+        renderCheckPage();
+      };
+
+      window.downloadCheckSnapshotsJson = function () {
+        const payload = {
+          version: 1,
+          app: "ComboGesss",
+          updatedAt: new Date().toISOString(),
+          minPctFilter: checkState.minPct,
+          snapshots: checkState.snapshots
+        };
+        const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json;charset=utf-8" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = "check_snapshots.json";
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+      };
+
+      window.cgCheckModule = {
+        async onRender() {
+          await syncSnapshotsWithRounds();
+          decoratePickBoxesWithDots();
+          if (checkState.isOpen) renderCheckPage();
+        },
+        decorate() {
+          decoratePickBoxesWithDots();
+        }
+      };
+
+      window.addEventListener("DOMContentLoaded", async () => {
+        updateClock();
+        setInterval(updateClock, 1000);
+        await loadSnapshotsFromStorageAndGitHub();
+        await autoLoadComboGesssData();
+      });
+    })();
+
     (function initTechBg() {
       const layer = document.getElementById('techBgLayer');
       if (!layer) return;
@@ -1592,7 +1996,6 @@
       line.className = 'cgScanline';
       layer.appendChild(line);
 
-      // piccolo "hex grid" decorativo in alto a destra, opzionale
       const hex = document.createElement('div');
       hex.style.cssText = `
         position:absolute; top:8%; right:6%; width:180px; height:180px;
@@ -1612,7 +2015,6 @@
   <script src="./home.js"></script>
   <script>
     if ("serviceWorker" in navigator) {
-      // quando una nuova versione prende il controllo, ricarica una volta sola
       var cgHadController = !!navigator.serviceWorker.controller, cgReloaded = false;
       navigator.serviceWorker.addEventListener("controllerchange", function () {
         if (cgHadController && !cgReloaded) { cgReloaded = true; location.reload(); }
