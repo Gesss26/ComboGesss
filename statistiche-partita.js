@@ -1066,24 +1066,36 @@
 
     el = document.createElement("div");
     el.id = OVERLAY_ID;
-    el.className = "fixed inset-0 z-50 hidden overflow-y-auto bg-slate-950/95 backdrop-blur-md text-slate-100";
-    el.innerHTML = `
-      <button
-        id="backToMatchesBtn"
-        type="button"
-        class="fixed top-4 left-4 z-[60] flex items-center gap-2 px-4 py-2.5 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white text-xs sm:text-sm font-extrabold shadow-xl shadow-cyan-950/60 border border-cyan-300/30 transition cursor-pointer"
-      >
-        <span>←</span>
-        <span>Torna alle partite</span>
-      </button>
-
-      <div id="matchStatsScreenContent" class="max-w-7xl mx-auto px-4 pt-20 pb-14"></div>
-    `;
-
+    // niente backdrop-blur: creerebbe un contenitore che farebbe scorrere i pulsanti "fissi"
+    el.className = "fixed inset-0 z-50 hidden overflow-y-auto text-slate-100";
+    el.style.webkitOverflowScrolling = "touch";
+    el.innerHTML = `<div id="matchStatsScreenContent" class="max-w-7xl mx-auto px-3 sm:px-4 pt-20 pb-14"></div>`;
     document.body.appendChild(el);
+
+    // Pulsanti flottanti: stanno nel body (non nell'overlay) cosi' restano sempre fissi
+    const floating = document.createElement("div");
+    floating.id = "cgFloatingNav";
+    floating.style.cssText =
+      "position:fixed;z-index:70;left:calc(env(safe-area-inset-left,0px) + 12px);" +
+      "top:calc(env(safe-area-inset-top,0px) + 12px);display:none;flex-direction:column;gap:8px;align-items:flex-start;";
+    const btnCss =
+      "display:inline-flex;align-items:center;gap:8px;min-height:42px;padding:8px 14px;border-radius:12px;" +
+      "font-weight:800;font-size:13px;color:#fff;cursor:pointer;border:1px solid rgba(165,243,252,0.35);" +
+      "box-shadow:0 8px 24px rgba(2,12,30,0.6);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);touch-action:manipulation;";
+    floating.innerHTML = `
+      <button id="backToMatchesBtn" type="button" style="${btnCss}background:rgba(8,145,178,0.92);">
+        <span>←</span><span>Torna al Menù</span>
+      </button>
+      <button id="scrollTopBtn" type="button" style="${btnCss}background:rgba(15,23,42,0.88);">
+        <span>↑</span><span>Torna in cima</span>
+      </button>`;
+    document.body.appendChild(floating);
 
     document.getElementById("backToMatchesBtn").addEventListener("click", () => {
       window.closeMatchStatsScreen();
+    });
+    document.getElementById("scrollTopBtn").addEventListener("click", () => {
+      el.scrollTo({ top: 0, behavior: "smooth" });
     });
 
     document.addEventListener("keydown", (e) => {
@@ -1286,6 +1298,8 @@
 
     overlay.classList.remove("hidden");
     overlay.scrollTop = 0;
+    const nav = document.getElementById("cgFloatingNav");
+    if (nav) nav.style.display = "flex";
   };
 
   window.closeMatchStatsScreen = function () {
@@ -1293,5 +1307,7 @@
     if (overlay) {
       overlay.classList.add("hidden");
     }
+    const nav = document.getElementById("cgFloatingNav");
+    if (nav) nav.style.display = "none";
   };
 })();

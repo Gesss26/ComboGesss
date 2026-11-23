@@ -2,7 +2,14 @@
 <html lang="it">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#04112a" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="ComboGesss" />
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="apple-touch-icon" href="apple-touch-icon.png" />
   <title>ComboGesss — Statistiche Calcio Europee</title>
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚽</text></svg>" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -352,13 +359,13 @@
 
     /* Card partita già giocata: sfondo grigio */
     .match-played {
-      background: linear-gradient(180deg, rgba(71, 85, 105, 0.55) 0%, rgba(51, 65, 85, 0.65) 100%) !important;
-      border-color: rgba(148, 163, 184, 0.45) !important;
-      box-shadow: inset 0 1px 0 rgba(226, 232, 240, 0.08), 0 0 18px rgba(100, 116, 139, 0.25);
+      background: linear-gradient(180deg, #5b6677 0%, #475264 100%) !important;
+      border-color: rgba(203, 213, 225, 0.55) !important;
+      box-shadow: inset 0 1px 0 rgba(226, 232, 240, 0.12), 0 0 18px rgba(100, 116, 139, 0.30);
     }
     .match-played:hover {
-      background: linear-gradient(180deg, rgba(100, 116, 139, 0.60) 0%, rgba(71, 85, 105, 0.70) 100%) !important;
-      border-color: rgba(203, 213, 225, 0.60) !important;
+      background: linear-gradient(180deg, #667286 0%, #536076 100%) !important;
+      border-color: rgba(226, 232, 240, 0.70) !important;
     }
     /* Riquadro risultato in evidenza */
     .match-result-badge {
@@ -404,6 +411,58 @@
     @keyframes splashIn {
       from { opacity: 0; transform: scale(0.85); }
       to   { opacity: 1; transform: scale(1); }
+    }
+
+    /* ===== PWA / mobile / tablet ===== */
+    html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+    body {
+      -webkit-tap-highlight-color: transparent;
+      padding-left: env(safe-area-inset-left, 0px);
+      padding-right: env(safe-area-inset-right, 0px);
+      padding-bottom: env(safe-area-inset-bottom, 0px);
+      overscroll-behavior-y: none;
+    }
+    header { padding-top: env(safe-area-inset-top, 0px); }
+    button, select, label, [role="button"] { touch-action: manipulation; }
+
+    @media (pointer: coarse) {
+      button, select, label.cursor-pointer { min-height: 40px; }
+      .view-switch { min-height: 24px; }
+    }
+
+    /* Telefono e tablet verticale: nazioni e campionati come righe scorrevoli */
+    @media (max-width: 1023px) {
+      #countriesList, #leaguesList {
+        display: flex !important; flex-direction: row; gap: 8px;
+        overflow-x: auto; overflow-y: hidden; max-height: none !important;
+        padding: 2px 2px 8px; scroll-snap-type: x proximity;
+        -webkit-overflow-scrolling: touch;
+      }
+      #countriesList > *, #leaguesList > * {
+        margin: 0 !important; flex: 0 0 auto; width: auto !important; scroll-snap-align: start;
+      }
+      #countriesList > button { padding: 10px 14px; }
+      #countriesList > button > span:last-child { display: none; }
+      #leaguesList > button { min-width: 180px; }
+      main { gap: 16px !important; padding-top: 12px !important; padding-bottom: 24px !important; }
+    }
+    /* Tablet: header piu' arioso, card su una colonna comoda */
+    @media (min-width: 640px) and (max-width: 1023px) {
+      #leaguesList > button { min-width: 220px; }
+    }
+    /* Telefono */
+    @media (max-width: 767px) {
+      header { position: static !important; }
+      header h1 { font-size: 1.1rem !important; }
+      #liveClock { display: none; }
+      header .ml-auto { width: 100%; align-items: stretch !important; }
+      header .ml-auto > div:last-child { width: 100%; }
+      header .ml-auto > div:last-child > * { flex: 1 1 0; text-align: center; }
+      .form-pill { width: 20px !important; height: 20px !important; font-size: 10px !important; }
+      .glass-card { border-radius: 14px; }
+    }
+    @media (max-width: 400px) {
+      main { padding-left: 10px !important; padding-right: 10px !important; }
     }
   </style>
 </head>
@@ -1364,7 +1423,7 @@
               <div class="flex items-center gap-3 flex-wrap">
                 <div class="text-left">
                   <div class="text-[10px] uppercase tracking-wider text-slate-400">Stato di forma (ult. 5)</div>
-                  <div class="flex items-center gap-2 mt-1">
+                  <div class="flex items-center flex-wrap gap-x-2 gap-y-1.5 mt-1">
                     <div class="flex items-center gap-1">${renderFormPills(m.homeFormArr)}</div>
                     <span class="text-[11px]">${renderPctText(m.homeForm)}</span>
                     <span class="text-slate-600">|</span>
@@ -1483,5 +1542,14 @@
   </script>
 
   <script src="./statistiche-partita.js"></script>
+  <script>
+    if ("serviceWorker" in navigator) {
+      window.addEventListener("load", function () {
+        navigator.serviceWorker.register("./sw.js").catch(function (e) {
+          console.warn("Service worker non registrato:", e);
+        });
+      });
+    }
+  </script>
 </body>
 </html>
