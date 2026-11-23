@@ -1,5 +1,5 @@
 // Service worker ComboGesss — aumenta VERSION a ogni rilascio per forzare l'aggiornamento
-const VERSION = "cg-v4";
+const VERSION = "cg-v6";
 const SHELL = `${VERSION}-shell`;
 const RUNTIME = `${VERSION}-runtime`;
 const SHELL_FILES = [

@@ -499,7 +499,7 @@
             <span class="text-[11px] uppercase tracking-wider px-2 py-0.5 rounded-full bg-cyan-500/15 text-cyan-300 border border-cyan-500/30">
               Europa 2026/27
             </span>
-            <span id="appVersion" class="text-[10px] text-slate-500">build 4</span>
+            <span id="appVersion" class="text-[10px] text-slate-500">build 6</span>
           </div>
           <p id="dataStatusText" class="text-xs text-slate-400">Inizializzazione dati in corso...</p>
         </div>
@@ -1210,26 +1210,37 @@
       statusEl.textContent = "Caricamento automatico file da ./data/...";
 
       const sources = [
-        { path: "./data/all_leagues.csv", key: "combogesss_results", target: "resultsRows" },
+        { path: "./data/all-euro-data-2026-2027.xlsx", key: "combogesss_results", target: "resultsRows", allSheets: true },
+        { path: "./data/all_leagues.csv", key: "combogesss_results", target: "resultsRows", onlyIfMissing: true },
         { path: "./data/fixtures.xlsx", key: "combogesss_fixtures", target: "fixturesRows" }
       ];
 
       let loadedAny = false;
+      let resultsLoaded = false;
 
       for (const src of sources) {
+        if (src.onlyIfMissing && resultsLoaded) continue;
         try {
           const resp = await fetch(`${src.path}?t=${Date.now()}`, { cache: "no-store" });
           if (!resp.ok) continue;
 
           const buf = await resp.arrayBuffer();
           const wb = XLSX.read(buf, { type: "array", cellDates: false });
-          const sheet = wb.Sheets[wb.SheetNames[0]];
-          const rows = XLSX.utils.sheet_to_json(sheet, { defval: "", raw: false });
+          const sheetNames = src.allSheets ? wb.SheetNames : [wb.SheetNames[0]];
+          const rows = [];
+          for (const name of sheetNames) {
+            const part = XLSX.utils.sheet_to_json(wb.Sheets[name], { defval: "", raw: false });
+            for (const r of part) {
+              if (src.allSheets && !r.Div && !r.DivCode) r.Div = name;
+              rows.push(r);
+            }
+          }
 
-          if (Array.isArray(rows) && rows.length > 0) {
+          if (rows.length > 0) {
             state[src.target] = rows;
             await cgDB.set(src.key, rows);
             loadedAny = true;
+            if (src.target === "resultsRows") resultsLoaded = true;
           }
         } catch (err) {
           console.warn(`Impossibile leggere ${src.path}:`, err);
@@ -1261,6 +1272,20 @@
       renderAll();
     }
 
+    // Unisce righe risultati evitando doppioni: stessa Div + data + squadre => vale la riga più nuova
+    function mergeResultRows(oldRows, newRows) {
+      const keyOf = (r) => [
+        String(r.Div || r.DivCode || "").trim().toUpperCase(),
+        formatExcelDate(r.Date),
+        String(r.HomeTeam || r.Home || "").trim().toLowerCase(),
+        String(r.AwayTeam || r.Away || "").trim().toLowerCase()
+      ].join("|");
+      const map = new Map();
+      for (const r of oldRows || []) map.set(keyOf(r), r);
+      for (const r of newRows || []) map.set(keyOf(r), r);
+      return Array.from(map.values());
+    }
+
     async function handleManualUpload(event) {
       const files = Array.from(event.target.files || []);
       if (!files.length) return;
@@ -1285,7 +1310,7 @@
           state.fixturesRows = combinedRows;
           await cgDB.set("combogesss_fixtures", combinedRows);
         } else {
-          state.resultsRows = [...state.resultsRows, ...combinedRows];
+          state.resultsRows = mergeResultRows(state.resultsRows, combinedRows);
           await cgDB.set("combogesss_results", state.resultsRows);
         }
       }
@@ -1422,7 +1447,9 @@
         const dateTimeStr = [m.date, m.time].filter(Boolean).join(" • ");
         const isDiffBomb = clampPct(m.diffForm) >= 90;
         const isToday = m.date === todayStr;
-        const isPlayed = !!m.ftResult;
+        const hasResult = !!m.ftResult;
+        // grigia se ha il risultato oppure se la data è antecedente a oggi
+        const isPlayed = hasResult || isPastDate(m.date);
         const picks = (typeof window.computeMatchTopPicks === "function")
           ? window.computeMatchTopPicks(m, state.selectedLeagueCode, state.resultsRows)
           : { real: [], dixon: [] };
@@ -1444,7 +1471,7 @@
                 </div>
                 <div class="text-[11px] text-slate-400 mt-0.5 flex items-center flex-wrap gap-2">
                   <span>${dateTimeStr || "Programma campionato"}</span>
-                  ${isPlayed ? `
+                  ${hasResult ? `
                     <span class="match-result-badge">
                       <span class="ft-label">FT</span>
                       <span>${m.ftResult}</span>
