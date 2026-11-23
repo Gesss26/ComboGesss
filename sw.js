@@ -1,5 +1,5 @@
 // Service worker ComboGesss — aumenta VERSION a ogni rilascio per forzare l'aggiornamento
-const VERSION = "cg-v1";
+const VERSION = "cg-v4";
 const SHELL = `${VERSION}-shell`;
 const RUNTIME = `${VERSION}-runtime`;
 const SHELL_FILES = [
@@ -7,6 +7,7 @@ const SHELL_FILES = [
   "./index.html",
   "./statistiche-partita.js",
   "./manifest.webmanifest",
+  "./tailwind.css",
   "./Splashscreen.png",
   "./icon-192.png",
   "./icon-512.png",
@@ -32,7 +33,8 @@ self.addEventListener("activate", (event) => {
 // Rete prima (dati sempre aggiornati), cache se offline
 async function networkFirst(request, cacheName) {
   try {
-    const fresh = await fetch(request);
+    // no-cache: salta la cache HTTP del browser/GitHub Pages, così vedi subito i file nuovi
+    const fresh = await fetch(request, { cache: "no-cache" });
     if (fresh && fresh.ok) {
       const cache = await caches.open(cacheName);
       cache.put(request, fresh.clone());

@@ -15,7 +15,9 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Exo+2:wght@400;500;600;700;800&family=Orbitron:wght@500;700;900&display=swap" rel="stylesheet" />
-  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Tailwind compilato (tailwind.css). Se il file non c'è ancora, si usa il CDN come ripiego -->
+  <link rel="stylesheet" href="tailwind.css"
+        onerror="var s=document.createElement('script');s.src='https://cdn.tailwindcss.com';document.head.appendChild(s);" />
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <style>
     body {
@@ -497,6 +499,7 @@
             <span class="text-[11px] uppercase tracking-wider px-2 py-0.5 rounded-full bg-cyan-500/15 text-cyan-300 border border-cyan-500/30">
               Europa 2026/27
             </span>
+            <span id="appVersion" class="text-[10px] text-slate-500">build 4</span>
           </div>
           <p id="dataStatusText" class="text-xs text-slate-400">Inizializzazione dati in corso...</p>
         </div>
@@ -1167,6 +1170,41 @@
       return finalRounds;
     }
 
+    // Cache locale su IndexedDB (localStorage ha un limite di ~5 MB e il CSV lo supera)
+    const cgDB = (() => {
+      let dbPromise = null;
+      const open = () => dbPromise || (dbPromise = new Promise((resolve, reject) => {
+        const req = indexedDB.open("combogesss", 1);
+        req.onupgradeneeded = () => req.result.createObjectStore("kv");
+        req.onsuccess = () => resolve(req.result);
+        req.onerror = () => reject(req.error);
+      }));
+      return {
+        async set(key, value) {
+          try {
+            const db = await open();
+            await new Promise((res, rej) => {
+              const tx = db.transaction("kv", "readwrite");
+              tx.objectStore("kv").put(value, key);
+              tx.oncomplete = res; tx.onerror = () => rej(tx.error); tx.onabort = () => rej(tx.error);
+            });
+            return true;
+          } catch (e) { console.warn("Cache locale non salvata:", e); return false; }
+        },
+        async get(key) {
+          try {
+            const db = await open();
+            return await new Promise((res, rej) => {
+              const r = db.transaction("kv").objectStore("kv").get(key);
+              r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error);
+            });
+          } catch (e) { return undefined; }
+        }
+      };
+    })();
+    // pulizia della vecchia cache che saturava localStorage
+    try { localStorage.removeItem("combogesss_results"); localStorage.removeItem("combogesss_fixtures"); } catch (_) {}
+
     async function autoLoadComboGesssData(forceReload = false) {
       const statusEl = document.getElementById("dataStatusText");
       statusEl.textContent = "Caricamento automatico file da ./data/...";
@@ -1190,7 +1228,7 @@
 
           if (Array.isArray(rows) && rows.length > 0) {
             state[src.target] = rows;
-            localStorage.setItem(src.key, JSON.stringify(rows));
+            await cgDB.set(src.key, rows);
             loadedAny = true;
           }
         } catch (err) {
@@ -1200,8 +1238,8 @@
 
       if (!loadedAny && !forceReload) {
         try {
-          const cachedRes = JSON.parse(localStorage.getItem("combogesss_results") || "[]");
-          const cachedFix = JSON.parse(localStorage.getItem("combogesss_fixtures") || "[]");
+          const cachedRes = (await cgDB.get("combogesss_results")) || [];
+          const cachedFix = (await cgDB.get("combogesss_fixtures")) || [];
           if (cachedRes.length || cachedFix.length) {
             state.resultsRows = cachedRes;
             state.fixturesRows = cachedFix;
@@ -1245,10 +1283,10 @@
 
         if (file.name.toLowerCase().includes("fix")) {
           state.fixturesRows = combinedRows;
-          localStorage.setItem("combogesss_fixtures", JSON.stringify(combinedRows));
+          await cgDB.set("combogesss_fixtures", combinedRows);
         } else {
           state.resultsRows = [...state.resultsRows, ...combinedRows];
-          localStorage.setItem("combogesss_results", JSON.stringify(state.resultsRows));
+          await cgDB.set("combogesss_results", state.resultsRows);
         }
       }
 
@@ -1544,6 +1582,11 @@
   <script src="./statistiche-partita.js"></script>
   <script>
     if ("serviceWorker" in navigator) {
+      // quando una nuova versione prende il controllo, ricarica una volta sola
+      var cgHadController = !!navigator.serviceWorker.controller, cgReloaded = false;
+      navigator.serviceWorker.addEventListener("controllerchange", function () {
+        if (cgHadController && !cgReloaded) { cgReloaded = true; location.reload(); }
+      });
       window.addEventListener("load", function () {
         navigator.serviceWorker.register("./sw.js").catch(function (e) {
           console.warn("Service worker non registrato:", e);
