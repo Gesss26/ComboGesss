@@ -153,6 +153,7 @@
           <label class="cg-chk"><input id="st-motion" type="checkbox" ${S.reduceMotion ? "checked" : ""}> Riduci animazioni (telefoni lenti)</label>
         </div>
       </div>
+      ${window.cgAppearance ? window.cgAppearance.html() : ""}
       ${sched}
       <div class="cg-card"><h3>💾 Dati e backup</h3>
         <div class="cg-row">
@@ -171,6 +172,7 @@
         <div class="cg-hint" style="margin-top:0">${esc((document.getElementById("appVersion") || {}).textContent || "")} · ${esc(((document.getElementById("dataStatusText") || {}).textContent || "").trim().slice(0, 120))}</div>
         <div class="cg-row"><button class="cg-btn" data-set="refresh">🔄 Aggiorna app (svuota cache)</button></div>
       </div>`;
+    if (window.cgAppearance) window.cgAppearance.bind($("#cg-imp-body"));
   }
 
   function applyGeneral() {

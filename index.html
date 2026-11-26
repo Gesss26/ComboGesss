@@ -493,34 +493,6 @@
       .cg-picks-wrap .cg-pick-row { font-size: calc(11px * var(--cg-fs)); }
     }
 
-    #cgFsFab {
-      position: fixed; right: 14px; bottom: calc(14px + env(safe-area-inset-bottom, 0px));
-      z-index: 9000; width: 44px; height: 44px; border-radius: 50%;
-      display: flex; align-items: center; justify-content: center;
-      font: 800 15px "Exo 2", system-ui, sans-serif; letter-spacing: -0.5px;
-      color: #a5f3fc; background: rgba(2, 10, 28, 0.92);
-      border: 1px solid rgba(34, 211, 238, 0.55);
-      box-shadow: 0 0 16px rgba(34, 211, 238, 0.35); cursor: pointer;
-    }
-    #cgFsPanel {
-      position: fixed; right: 14px; bottom: calc(66px + env(safe-area-inset-bottom, 0px));
-      z-index: 9000; width: min(300px, calc(100vw - 28px)); padding: 14px;
-      border-radius: 14px; background: rgba(2, 10, 28, 0.96);
-      border: 1px solid rgba(34, 211, 238, 0.4);
-      box-shadow: 0 10px 36px rgba(0, 0, 0, 0.55), 0 0 20px rgba(34, 211, 238, 0.18);
-      font: 600 13px "Exo 2", system-ui, sans-serif; color: #e6f4ff;
-    }
-    #cgFsPanel[hidden] { display: none; }
-    #cgFsPanel .cgfs-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
-    #cgFsPanel .cgfs-val { color: #67e8f9; font-weight: 800; font-variant-numeric: tabular-nums; }
-    #cgFsPanel .cgfs-row { display: flex; align-items: center; gap: 10px; }
-    #cgFsPanel .cgfs-row span { color: #94a3b8; font-weight: 800; }
-    #cgFsPanel input[type=range] { flex: 1; min-width: 0; accent-color: #22d3ee; height: 28px; }
-    #cgFsReset {
-      margin-top: 10px; width: 100%; padding: 8px; border-radius: 8px; cursor: pointer;
-      font: 600 12px "Exo 2", system-ui, sans-serif; color: #e2e8f0;
-      background: #1e293b; border: 1px solid #334155; min-height: 36px;
-    }
 
     #cgBar { display:flex; flex-wrap:wrap; gap:8px; align-items:center; padding:10px; border-radius:14px; margin-bottom:10px; }
     .cgb-in { background:#0f172a; color:#e6f4ff; border:1px solid #334155; border-radius:8px; padding:7px 10px; font:600 12px "Exo 2",system-ui,sans-serif; min-width:0; }
@@ -538,15 +510,11 @@
     .cgm-t { width:100%; border-collapse:collapse; } .cgm-t td, .cgm-t th { padding:6px 4px; border-bottom:1px solid #1e293b; text-align:center; } .cgm-t td:first-child { text-align:left; color:#94a3b8; }
     .cgm-h { margin:12px 0 4px; color:#67e8f9; }
     #cgTrend { border-radius:14px; padding:14px; margin-bottom:12px; } .cgt-t { font-weight:800; margin-bottom:6px; color:#fff; } .cgt-n { font-size:12px; color:#94a3b8; margin-top:6px; }
-    #cgFsPanel .cgfs-sec { display:flex; flex-direction:column; gap:10px; margin-top:12px; padding-top:12px; border-top:1px solid #1e293b; }
-    #cgFsPanel .cgfs-sec label { display:flex; justify-content:space-between; align-items:center; gap:8px; }
-    #cgFsPanel .cgfs-chk { justify-content:flex-start !important; }
-    #cgFsPanel .cgfs-bk { display:flex; gap:8px; } #cgFsPanel .cgfs-bk button { flex:1; padding:8px; border-radius:8px; background:#1e293b; border:1px solid #334155; color:#e2e8f0; font:600 12px "Exo 2",system-ui,sans-serif; min-height:36px; }
     html.cg-hc .text-slate-300, html.cg-hc .text-slate-400, html.cg-hc .text-slate-500 { color:#f8fafc !important; }
     html.cg-hc .glass-card, html.cg-hc .border-slate-700, html.cg-hc .border-slate-800 { border-color:rgba(165,243,252,.65) !important; }
     html.cg-hc body { background-image:none !important; background-color:#000 !important; }
     html.cg-light { filter:invert(1) hue-rotate(180deg); background:#fff; }
-    html.cg-light img, html.cg-light video, html.cg-light #cgFsFab { filter:invert(1) hue-rotate(180deg); }
+    html.cg-light img, html.cg-light video { filter:invert(1) hue-rotate(180deg); }
   </style>
 </head>
 <body class="min-h-screen flex flex-col cg-v-home">
@@ -2193,50 +2161,6 @@
     }
   </script>
 
-  <!-- Impostazione dimensione caratteri -->
-  <button id="cgFsFab" type="button" aria-label="Dimensione caratteri" aria-expanded="false" title="Dimensione caratteri">Aa</button>
-  <div id="cgFsPanel" role="dialog" aria-label="Dimensione caratteri" hidden>
-    <div class="cgfs-head"><span>🔠 Dimensione caratteri</span><span class="cgfs-val" id="cgFsVal">100%</span></div>
-    <div class="cgfs-row">
-      <span style="font-size:12px">A</span>
-      <input id="cgFsRange" type="range" min="80" max="140" step="5" value="100" aria-label="Dimensione caratteri" />
-      <span style="font-size:20px">A</span>
-    </div>
-    <button id="cgFsReset" type="button">Ripristina (100%)</button>
-  </div>
-  <script>
-    (function () {
-      var fab = document.getElementById("cgFsFab"),
-          panel = document.getElementById("cgFsPanel"),
-          range = document.getElementById("cgFsRange"),
-          val = document.getElementById("cgFsVal"),
-          reset = document.getElementById("cgFsReset");
-      var KEY = "cg_font_scale";
-
-      function apply(pct, save) {
-        pct = Math.min(140, Math.max(80, Number(pct) || 100));
-        document.documentElement.style.setProperty("--cg-fs", pct / 100);
-        range.value = pct;
-        val.textContent = pct + "%";
-        if (save) { try { localStorage.setItem(KEY, String(pct / 100)); } catch (_) {} }
-      }
-
-      var saved = 100;
-      try { saved = Math.round((parseFloat(localStorage.getItem(KEY)) || 1) * 100); } catch (_) {}
-      apply(saved, false);
-
-      range.addEventListener("input", function () { apply(range.value, true); });
-      reset.addEventListener("click", function () { apply(100, true); });
-
-      function toggle(open) {
-        panel.hidden = !open;
-        fab.setAttribute("aria-expanded", open ? "true" : "false");
-      }
-      fab.addEventListener("click", function (e) { e.stopPropagation(); toggle(panel.hidden); });
-      panel.addEventListener("click", function (e) { e.stopPropagation(); });
-      document.addEventListener("click", function () { toggle(false); });
-    })();
-  </script>
   <div id="cgOff" hidden></div>
   <div id="cgModal" hidden><div class="cgm-box"><div class="cgm-head"><b>⚖️ Confronto squadre</b><button type="button" id="cgmClose">✕</button></div><div id="cgmBody"></div></div></div>
   <script>
@@ -2407,39 +2331,60 @@
       c.toggle("cg-hc", ui.theme === "hc"); c.toggle("cg-light", ui.theme === "light");
     }
     applyTheme();
-    var panel = document.getElementById("cgFsPanel"), rb = document.getElementById("cgFsReset");
-    var sec = document.createElement("div");
-    sec.className = "cgfs-sec";
-    sec.innerHTML =
-      '<label>🎨 Tema <select id="cgTheme" class="cgb-in"><option value="dark">Scuro</option><option value="hc">Alto contrasto</option><option value="light">Chiaro (beta)</option></select></label>' +
-      '<label class="cgfs-chk"><input type="checkbox" id="cgNotif"> 🔔 Notifiche (nuovi risultati / % alte)</label>' +
-      '<div class="cgfs-bk"><button type="button" id="cgBkDl">💾 Backup</button><button type="button" id="cgBkUp">♻️ Ripristina</button></div>' +
-      '<input type="file" id="cgBkFile" accept=".json,application/json" hidden />';
-    panel.insertBefore(sec, rb);
-    var th = document.getElementById("cgTheme"); th.value = ui.theme;
-    th.addEventListener("change", function () { ui.theme = th.value; save(); applyTheme(); });
-    var nt = document.getElementById("cgNotif"); nt.checked = !!ui.notif && window.Notification && Notification.permission === "granted";
-    nt.addEventListener("change", function () {
-      if (!nt.checked) { ui.notif = false; save(); return; }
-      if (!window.Notification) { alert("Notifiche non supportate da questo browser"); nt.checked = false; return; }
-      Notification.requestPermission().then(function (p) { ui.notif = p === "granted"; nt.checked = ui.notif; save(); });
-    });
-    document.getElementById("cgBkDl").addEventListener("click", function () { window.downloadCheckSnapshotsJson(); });
-    document.getElementById("cgBkUp").addEventListener("click", function () { document.getElementById("cgBkFile").click(); });
-    document.getElementById("cgBkFile").addEventListener("change", function (e) {
-      var f = e.target.files[0]; if (!f) return;
-      var fr = new FileReader();
-      fr.onload = async function () {
-        try {
-          var inc = (JSON.parse(fr.result) || {}).snapshots, I = window.cgCheckInternals, cur = I.snaps(), n = 0;
-          if (!inc || typeof inc !== "object") throw 0;
-          Object.keys(inc).forEach(function (k) { if (!cur[k] || (inc[k].frozen && !cur[k].frozen)) { cur[k] = inc[k]; n++; } });
-          await I.persist(); await renderAll(); alert("Ripristino completato: " + n + " snapshot aggiunti/aggiornati.");
-        } catch (_) { alert("File non valido."); }
-        e.target.value = "";
-      };
-      fr.readAsText(f);
-    });
+    function curFs() { try { return Math.round((parseFloat(localStorage.getItem("cg_font_scale")) || 1) * 100); } catch (_) { return 100; } }
+    function applyFs(p, persist) {
+      p = Math.min(140, Math.max(80, Number(p) || 100));
+      document.documentElement.style.setProperty("--cg-fs", p / 100);
+      if (persist) { try { localStorage.setItem("cg_font_scale", String(p / 100)); } catch (_) {} }
+      return p;
+    }
+    window.cgAppearance = {
+      html: function () {
+        return '<div class="cg-card"><h3>🎨 Aspetto e notifiche</h3><div class="cg-set">' +
+          '<label>Dimensione caratteri: <b id="ap-fsv">100%</b><input id="ap-fs" type="range" min="80" max="140" step="5" style="accent-color:#22d3ee"></label>' +
+          '<label>Tema<select id="ap-theme"><option value="dark">Scuro</option><option value="hc">Alto contrasto</option><option value="light">Chiaro (beta)</option></select></label>' +
+          '<label class="cg-chk"><input id="ap-notif" type="checkbox"> 🔔 Notifiche (nuovi risultati / % alte)</label></div>' +
+          '<div class="cg-row"><button class="cg-btn" id="ap-fs-reset" type="button">↺ Caratteri al 100%</button></div>' +
+          '<div class="cg-hint">Le notifiche arrivano solo mentre l\'app è aperta. Il tema Chiaro è sperimentale.</div></div>' +
+          '<div class="cg-card"><h3>📊 Backup giocate (Check)</h3><div class="cg-row">' +
+          '<button class="cg-btn" id="ap-bk-dl" type="button">💾 Scarica snapshot</button>' +
+          '<button class="cg-btn" id="ap-bk-up" type="button">♻️ Ripristina snapshot</button>' +
+          '<input id="ap-bk-file" type="file" accept=".json,application/json" style="display:none"></div>' +
+          '<div class="cg-hint">Storico delle giocate usato dalla pagina Check. Il ripristino unisce i dati senza cancellare quelli esistenti.</div></div>';
+      },
+      bind: function (root) {
+        var $ = function (id) { return root.querySelector("#" + id); };
+        var fs = $("ap-fs"), v = $("ap-fsv");
+        if (!fs) return;
+        fs.value = curFs(); v.textContent = fs.value + "%";
+        fs.addEventListener("input", function () { v.textContent = applyFs(fs.value, true) + "%"; });
+        $("ap-fs-reset").addEventListener("click", function () { fs.value = 100; v.textContent = applyFs(100, true) + "%"; });
+        var th = $("ap-theme"); th.value = ui.theme;
+        th.addEventListener("change", function () { ui.theme = th.value; save(); applyTheme(); });
+        var nt = $("ap-notif"); nt.checked = !!ui.notif && !!window.Notification && Notification.permission === "granted";
+        nt.addEventListener("change", function () {
+          if (!nt.checked) { ui.notif = false; save(); return; }
+          if (!window.Notification) { alert("Notifiche non supportate da questo browser"); nt.checked = false; return; }
+          Notification.requestPermission().then(function (p) { ui.notif = p === "granted"; nt.checked = ui.notif; save(); });
+        });
+        $("ap-bk-dl").addEventListener("click", function () { window.downloadCheckSnapshotsJson(); });
+        $("ap-bk-up").addEventListener("click", function () { $("ap-bk-file").click(); });
+        $("ap-bk-file").addEventListener("change", function (e) {
+          var f = e.target.files[0]; if (!f) return;
+          var fr = new FileReader();
+          fr.onload = async function () {
+            try {
+              var inc = (JSON.parse(fr.result) || {}).snapshots, I = window.cgCheckInternals, cur = I.snaps(), n = 0;
+              if (!inc || typeof inc !== "object") throw 0;
+              Object.keys(inc).forEach(function (k) { if (!cur[k] || (inc[k].frozen && !cur[k].frozen)) { cur[k] = inc[k]; n++; } });
+              await I.persist(); await renderAll(); alert("Ripristino completato: " + n + " snapshot aggiunti/aggiornati.");
+            } catch (_) { alert("File non valido."); }
+            e.target.value = "";
+          };
+          fr.readAsText(f);
+        });
+      }
+    };
 
     /* 7+8) dopo ogni caricamento: ultimo aggiornamento, offline, notifiche */
     function banner() {

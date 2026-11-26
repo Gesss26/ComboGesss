@@ -1,11 +1,14 @@
 // Service worker ComboGesss — aumenta VERSION a ogni rilascio per forzare l'aggiornamento
-const VERSION = "cg-v6";
+const VERSION = "cg-v8";
 const SHELL = `${VERSION}-shell`;
 const RUNTIME = `${VERSION}-runtime`;
 const SHELL_FILES = [
   "./",
   "./index.html",
   "./statistiche-partita.js",
+  "./schedina.js",
+  "./conto.js",
+  "./home.js",
   "./manifest.webmanifest",
   "./tailwind.css",
   "./Splashscreen.png",
