@@ -1115,7 +1115,7 @@
       "top:calc(env(safe-area-inset-top,0px) + 12px);display:none;flex-direction:column;gap:8px;align-items:flex-start;";
     const btnCss =
       "display:inline-flex;align-items:center;gap:8px;min-height:42px;padding:8px 14px;border-radius:12px;" +
-      "font-weight:800;font-size:13px;color:#fff;cursor:pointer;border:1px solid rgba(165,243,252,0.35);" +
+      "font-weight:800;font-size:calc(13px * var(--cg-fs,1));color:#fff;cursor:pointer;border:1px solid rgba(165,243,252,0.35);" +
       "box-shadow:0 8px 24px rgba(2,12,30,0.6);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);touch-action:manipulation;";
     floating.innerHTML = `
       <button id="backToMatchesBtn" type="button" style="${btnCss}background:rgba(8,145,178,0.92);">
