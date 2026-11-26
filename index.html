@@ -10,6 +10,14 @@
   <meta name="apple-mobile-web-app-title" content="ComboGesss" />
   <link rel="manifest" href="manifest.webmanifest" />
   <link rel="apple-touch-icon" href="apple-touch-icon.png" />
+  <script>
+    (function () {
+      try {
+        var v = parseFloat(localStorage.getItem("cg_font_scale"));
+        if (v >= 0.8 && v <= 1.4) document.documentElement.style.setProperty("--cg-fs", v);
+      } catch (_) {}
+    })();
+  </script>
   <title>ComboGesss — Statistiche Calcio Europee</title>
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚽</text></svg>" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -467,6 +475,50 @@
     }
     @media (max-width: 400px) {
       main { padding-left: 10px !important; padding-right: 10px !important; }
+    }
+
+    /* =====================================================
+       DIMENSIONE CARATTERI (slider) — --cg-fs = fattore di scala
+       ===================================================== */
+    :root { --cg-fs: 1; }
+    html { font-size: calc(16px * var(--cg-fs)); }
+    .text-\[10px\] { font-size: calc(10px * var(--cg-fs)) !important; }
+    .text-\[11px\] { font-size: calc(11px * var(--cg-fs)) !important; }
+    .form-pill { font-size: calc(11px * var(--cg-fs)) !important; }
+    .match-result-badge { font-size: calc(13px * var(--cg-fs)); }
+    .match-result-badge .ft-label { font-size: calc(10px * var(--cg-fs)); }
+    @media (max-width: 767px) {
+      .form-pill { font-size: calc(10px * var(--cg-fs)) !important; }
+      .cg-picks-wrap .cg-pick-row { font-size: calc(11px * var(--cg-fs)); }
+    }
+
+    #cgFsFab {
+      position: fixed; right: 14px; bottom: calc(14px + env(safe-area-inset-bottom, 0px));
+      z-index: 9000; width: 44px; height: 44px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font: 800 15px "Exo 2", system-ui, sans-serif; letter-spacing: -0.5px;
+      color: #a5f3fc; background: rgba(2, 10, 28, 0.92);
+      border: 1px solid rgba(34, 211, 238, 0.55);
+      box-shadow: 0 0 16px rgba(34, 211, 238, 0.35); cursor: pointer;
+    }
+    #cgFsPanel {
+      position: fixed; right: 14px; bottom: calc(66px + env(safe-area-inset-bottom, 0px));
+      z-index: 9000; width: min(300px, calc(100vw - 28px)); padding: 14px;
+      border-radius: 14px; background: rgba(2, 10, 28, 0.96);
+      border: 1px solid rgba(34, 211, 238, 0.4);
+      box-shadow: 0 10px 36px rgba(0, 0, 0, 0.55), 0 0 20px rgba(34, 211, 238, 0.18);
+      font: 600 13px "Exo 2", system-ui, sans-serif; color: #e6f4ff;
+    }
+    #cgFsPanel[hidden] { display: none; }
+    #cgFsPanel .cgfs-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+    #cgFsPanel .cgfs-val { color: #67e8f9; font-weight: 800; font-variant-numeric: tabular-nums; }
+    #cgFsPanel .cgfs-row { display: flex; align-items: center; gap: 10px; }
+    #cgFsPanel .cgfs-row span { color: #94a3b8; font-weight: 800; }
+    #cgFsPanel input[type=range] { flex: 1; min-width: 0; accent-color: #22d3ee; height: 28px; }
+    #cgFsReset {
+      margin-top: 10px; width: 100%; padding: 8px; border-radius: 8px; cursor: pointer;
+      font: 600 12px "Exo 2", system-ui, sans-serif; color: #e2e8f0;
+      background: #1e293b; border: 1px solid #334155; min-height: 36px;
     }
   </style>
 </head>
@@ -2108,6 +2160,51 @@
         });
       });
     }
+  </script>
+
+  <!-- Impostazione dimensione caratteri -->
+  <button id="cgFsFab" type="button" aria-label="Dimensione caratteri" aria-expanded="false" title="Dimensione caratteri">Aa</button>
+  <div id="cgFsPanel" role="dialog" aria-label="Dimensione caratteri" hidden>
+    <div class="cgfs-head"><span>🔠 Dimensione caratteri</span><span class="cgfs-val" id="cgFsVal">100%</span></div>
+    <div class="cgfs-row">
+      <span style="font-size:12px">A</span>
+      <input id="cgFsRange" type="range" min="80" max="140" step="5" value="100" aria-label="Dimensione caratteri" />
+      <span style="font-size:20px">A</span>
+    </div>
+    <button id="cgFsReset" type="button">Ripristina (100%)</button>
+  </div>
+  <script>
+    (function () {
+      var fab = document.getElementById("cgFsFab"),
+          panel = document.getElementById("cgFsPanel"),
+          range = document.getElementById("cgFsRange"),
+          val = document.getElementById("cgFsVal"),
+          reset = document.getElementById("cgFsReset");
+      var KEY = "cg_font_scale";
+
+      function apply(pct, save) {
+        pct = Math.min(140, Math.max(80, Number(pct) || 100));
+        document.documentElement.style.setProperty("--cg-fs", pct / 100);
+        range.value = pct;
+        val.textContent = pct + "%";
+        if (save) { try { localStorage.setItem(KEY, String(pct / 100)); } catch (_) {} }
+      }
+
+      var saved = 100;
+      try { saved = Math.round((parseFloat(localStorage.getItem(KEY)) || 1) * 100); } catch (_) {}
+      apply(saved, false);
+
+      range.addEventListener("input", function () { apply(range.value, true); });
+      reset.addEventListener("click", function () { apply(100, true); });
+
+      function toggle(open) {
+        panel.hidden = !open;
+        fab.setAttribute("aria-expanded", open ? "true" : "false");
+      }
+      fab.addEventListener("click", function (e) { e.stopPropagation(); toggle(panel.hidden); });
+      panel.addEventListener("click", function (e) { e.stopPropagation(); });
+      document.addEventListener("click", function () { toggle(false); });
+    })();
   </script>
 </body>
 </html>
