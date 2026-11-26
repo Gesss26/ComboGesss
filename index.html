@@ -520,6 +520,32 @@
       font: 600 12px "Exo 2", system-ui, sans-serif; color: #e2e8f0;
       background: #1e293b; border: 1px solid #334155; min-height: 36px;
     }
+
+    #cgBar { display:flex; flex-wrap:wrap; gap:8px; align-items:center; padding:10px; border-radius:14px; margin-bottom:10px; }
+    .cgb-in { background:#0f172a; color:#e6f4ff; border:1px solid #334155; border-radius:8px; padding:7px 10px; font:600 12px "Exo 2",system-ui,sans-serif; min-width:0; }
+    #cgQ { flex:1 1 150px; }
+    .cgb-btn { background:#1e293b; color:#e2e8f0; border:1px solid #334155; border-radius:8px; padding:7px 12px; font:600 12px "Exo 2",system-ui,sans-serif; }
+    .cgb-btn.on { background:rgba(250,204,21,.18); border-color:#facc15; color:#fde047; }
+    .cg-star { background:none !important; border:0 !important; padding:0 4px !important; min-height:0 !important; font-size:15px; line-height:1; cursor:pointer; }
+    #cgOff { position:fixed; left:0; right:0; top:0; z-index:9500; text-align:center; padding:calc(6px + env(safe-area-inset-top,0px)) 8px 6px; background:#b45309; color:#fff; font:700 12px "Exo 2",system-ui,sans-serif; }
+    #cgOff[hidden], #cgModal[hidden] { display:none; }
+    #cgModal { position:fixed; inset:0; z-index:9600; background:rgba(0,0,0,.65); display:flex; align-items:center; justify-content:center; padding:14px; }
+    .cgm-box { width:min(480px,100%); max-height:85vh; overflow:auto; background:#06142e; border:1px solid rgba(34,211,238,.45); border-radius:14px; padding:14px; color:#e6f4ff; font:600 13px "Exo 2",system-ui,sans-serif; }
+    .cgm-head { display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; }
+    .cgm-head button { background:none; border:0; color:#94a3b8; font-size:18px; }
+    .cgm-row { display:flex; gap:8px; align-items:center; margin-bottom:10px; } .cgm-row select { flex:1; }
+    .cgm-t { width:100%; border-collapse:collapse; } .cgm-t td, .cgm-t th { padding:6px 4px; border-bottom:1px solid #1e293b; text-align:center; } .cgm-t td:first-child { text-align:left; color:#94a3b8; }
+    .cgm-h { margin:12px 0 4px; color:#67e8f9; }
+    #cgTrend { border-radius:14px; padding:14px; margin-bottom:12px; } .cgt-t { font-weight:800; margin-bottom:6px; color:#fff; } .cgt-n { font-size:12px; color:#94a3b8; margin-top:6px; }
+    #cgFsPanel .cgfs-sec { display:flex; flex-direction:column; gap:10px; margin-top:12px; padding-top:12px; border-top:1px solid #1e293b; }
+    #cgFsPanel .cgfs-sec label { display:flex; justify-content:space-between; align-items:center; gap:8px; }
+    #cgFsPanel .cgfs-chk { justify-content:flex-start !important; }
+    #cgFsPanel .cgfs-bk { display:flex; gap:8px; } #cgFsPanel .cgfs-bk button { flex:1; padding:8px; border-radius:8px; background:#1e293b; border:1px solid #334155; color:#e2e8f0; font:600 12px "Exo 2",system-ui,sans-serif; min-height:36px; }
+    html.cg-hc .text-slate-300, html.cg-hc .text-slate-400, html.cg-hc .text-slate-500 { color:#f8fafc !important; }
+    html.cg-hc .glass-card, html.cg-hc .border-slate-700, html.cg-hc .border-slate-800 { border-color:rgba(165,243,252,.65) !important; }
+    html.cg-hc body { background-image:none !important; background-color:#000 !important; }
+    html.cg-light { filter:invert(1) hue-rotate(180deg); background:#fff; }
+    html.cg-light img, html.cg-light video, html.cg-light #cgFsFab { filter:invert(1) hue-rotate(180deg); }
   </style>
 </head>
 <body class="min-h-screen flex flex-col cg-v-home">
@@ -1520,6 +1546,7 @@
       } else {
         matches.sort((a, b) => b.diffForm - a.diffForm);
       }
+      if (typeof window.cgFilterMatches === "function") matches = window.cgFilterMatches(matches);
       updateViewSwitchUI();
       const orderLabel = state.viewMode === "chrono" ? "ordine cronologico" : "differenza di forma";
       const todayStr = getTodayStr();
@@ -1553,9 +1580,9 @@
               <div class="text-left w-full">
                 <div class="flex items-center gap-2 text-sm font-bold text-white">
                   ${renderFlagBadge(meta.nation, "w-4 h-3")}
-                  <span>${m.home}</span>
+                  ${window.cgStar ? cgStar(m.home) : ""}<span>${m.home}</span>
                   <span class="text-slate-500 font-normal">vs</span>
-                  <span>${m.away}</span>
+                  ${window.cgStar ? cgStar(m.away) : ""}<span>${m.away}</span>
                 </div>
                 <div class="text-[11px] text-slate-400 mt-0.5 flex items-center flex-wrap gap-2">
                   <span>${dateTimeStr || "Programma campionato"}</span>
@@ -1990,6 +2017,7 @@
       }
 
       function renderCheckPage() {
+        if (window.cgTrend) setTimeout(window.cgTrend, 0);
         const sel = document.getElementById("checkMinPctSelect");
         if (sel) sel.value = String(checkState.minPct);
 
@@ -2105,6 +2133,8 @@
         setTimeout(() => URL.revokeObjectURL(url), 1000);
       };
 
+      window.cgCheckInternals = { snaps: () => checkState.snapshots, minPct: () => checkState.minPct, evalLeg: evaluateSingleLeg, parseScore: parseScore, persist: persistSnapshotsLocal };
+
       window.cgCheckModule = {
         async onRender() {
           await syncSnapshotsWithRounds();
@@ -2205,6 +2235,247 @@
       panel.addEventListener("click", function (e) { e.stopPropagation(); });
       document.addEventListener("click", function () { toggle(false); });
     })();
+  </script>
+  <div id="cgOff" hidden></div>
+  <div id="cgModal" hidden><div class="cgm-box"><div class="cgm-head"><b>⚖️ Confronto squadre</b><button type="button" id="cgmClose">✕</button></div><div id="cgmBody"></div></div></div>
+  <script>
+  (function () {
+    var K = "cg_ui", ui = { minPct: 0, q: "", fav: false, favs: [], theme: "dark", notif: false, last: 0, seen: 0, alerted: [] };
+    try { Object.assign(ui, JSON.parse(localStorage.getItem(K) || "{}")); } catch (_) {}
+    function save() { try { localStorage.setItem(K, JSON.stringify(ui)); } catch (_) {} }
+    function norm(s) { return String(s || "").trim().toLowerCase(); }
+    function esc(s) { return String(s == null ? "" : s).replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; }); }
+    function picksOf(m) {
+      return typeof window.computeMatchTopPicks === "function"
+        ? window.computeMatchTopPicks(m, state.selectedLeagueCode, state.resultsRows) : { real: [], dixon: [] };
+    }
+    function maxPct(m) {
+      var p = picksOf(m), a = [].concat(p.real || [], p.dixon || []).map(function (x) { return Number(x.pct) || 0; });
+      return a.length ? Math.max.apply(null, a) : 0;
+    }
+
+    /* 1-3) filtro % minima, ricerca squadra, preferiti */
+    window.cgFilterMatches = function (ms) {
+      var q = norm(ui.q);
+      return ms.filter(function (m) {
+        if (q && norm(m.home).indexOf(q) < 0 && norm(m.away).indexOf(q) < 0) return false;
+        if (ui.fav && ui.favs.indexOf(norm(m.home)) < 0 && ui.favs.indexOf(norm(m.away)) < 0) return false;
+        if (ui.minPct > 0 && maxPct(m) < ui.minPct) return false;
+        return true;
+      });
+    };
+    window.cgStar = function (t) {
+      var on = ui.favs.indexOf(norm(t)) >= 0;
+      return '<button type="button" class="cg-star" data-team="' + esc(t) + '" aria-label="Preferito" style="color:' + (on ? "#facc15" : "#64748b") + '">' + (on ? "★" : "☆") + "</button>";
+    };
+    document.addEventListener("click", function (e) {
+      var b = e.target.closest && e.target.closest(".cg-star");
+      if (!b) return;
+      e.stopPropagation(); e.preventDefault();
+      var t = norm(b.getAttribute("data-team")), i = ui.favs.indexOf(t);
+      if (i >= 0) ui.favs.splice(i, 1); else ui.favs.push(t);
+      save(); renderMatches();
+      if (window.cgCheckModule) window.cgCheckModule.decorate();
+    }, true);
+
+    function mountBar() {
+      var list = document.getElementById("matchesList");
+      if (!list || document.getElementById("cgBar")) return;
+      var bar = document.createElement("div");
+      bar.id = "cgBar"; bar.className = "glass-card";
+      bar.innerHTML =
+        '<input id="cgQ" class="cgb-in" type="search" placeholder="🔍 Cerca squadra" value="' + esc(ui.q) + '" />' +
+        '<select id="cgMin" class="cgb-in"><option value="0">% min: tutte</option><option value="50">50%+</option><option value="60">60%+</option><option value="70">70%+</option><option value="80">80%+</option></select>' +
+        '<button type="button" id="cgFav" class="cgb-btn">⭐ Preferiti</button>' +
+        '<button type="button" id="cgCmp" class="cgb-btn">⚖️ Confronta</button>' +
+        '<button type="button" id="cgShare" class="cgb-btn">📤 Condividi</button>';
+      list.parentNode.insertBefore(bar, list);
+      var min = document.getElementById("cgMin"); min.value = String(ui.minPct);
+      document.getElementById("cgFav").classList.toggle("on", ui.fav);
+      document.getElementById("cgQ").addEventListener("input", function (e) { ui.q = e.target.value; save(); renderMatches(); });
+      min.addEventListener("change", function () { ui.minPct = Number(min.value) || 0; save(); renderMatches(); });
+      document.getElementById("cgFav").addEventListener("click", function () { ui.fav = !ui.fav; save(); this.classList.toggle("on", ui.fav); renderMatches(); });
+      document.getElementById("cgCmp").addEventListener("click", openCompare);
+      document.getElementById("cgShare").addEventListener("click", shareList);
+    }
+
+    /* 6) condividi giocate della lista visibile */
+    function shareList() {
+      var rounds = state.roundsByLeague[state.selectedLeagueCode] || [];
+      var r = rounds.find(function (x) { return x.roundNumber === state.selectedRound; }) || rounds[0];
+      if (!r) return;
+      var meta = getLeagueMeta(state.selectedLeagueCode);
+      var fmt = function (a) { return (a || []).map(function (p) { return p.label + " " + formatPct(p.pct); }).join(", ") || "—"; };
+      var txt = "⚽ ComboGesss — " + meta.name + " • " + r.label + "\n\n" + window.cgFilterMatches(r.matches).map(function (m) {
+        var p = picksOf(m);
+        return m.home + " - " + m.away + (m.date ? " (" + m.date + (m.time ? " " + m.time : "") + ")" : "") + "\nReali: " + fmt(p.real) + "\nDixon-Cole: " + fmt(p.dixon);
+      }).join("\n\n");
+      if (navigator.share) navigator.share({ text: txt }).catch(function () {});
+      else if (navigator.clipboard) navigator.clipboard.writeText(txt).then(function () { alert("Copiato negli appunti"); });
+    }
+
+    /* 9) confronto tra due squadre */
+    function rowsOf(t) {
+      var n = norm(t);
+      return state.resultsRows.filter(function (r) {
+        var h = norm(r.HomeTeam || r.Home), a = norm(r.AwayTeam || r.Away);
+        return (h === n || a === n) && r.FTHG !== undefined && r.FTHG !== "" && r.FTAG !== undefined && r.FTAG !== "";
+      });
+    }
+    function teamStats(t) {
+      var n = norm(t), rs = rowsOf(t).slice(-10), s = { n: rs.length, w: 0, d: 0, l: 0, gf: 0, ga: 0, o25: 0, cs: 0 };
+      rs.forEach(function (r) {
+        var home = norm(r.HomeTeam || r.Home) === n, f = +(home ? r.FTHG : r.FTAG), a = +(home ? r.FTAG : r.FTHG);
+        s.gf += f; s.ga += a; if (f > a) s.w++; else if (f === a) s.d++; else s.l++;
+        if (f + a > 2.5) s.o25++; if (a === 0) s.cs++;
+      });
+      return s;
+    }
+    function openCompare() {
+      var rounds = state.roundsByLeague[state.selectedLeagueCode] || [], set = {};
+      rounds.forEach(function (r) { r.matches.forEach(function (m) { set[m.home] = 1; set[m.away] = 1; }); });
+      var teams = Object.keys(set).sort(), opt = teams.map(function (t) { return "<option>" + esc(t) + "</option>"; }).join("");
+      var body = document.getElementById("cgmBody");
+      body.innerHTML = '<div class="cgm-row"><select id="cgA" class="cgb-in">' + opt + '</select><span>vs</span><select id="cgB" class="cgb-in">' + opt + '</select></div><div id="cgmOut"></div>';
+      document.getElementById("cgB").selectedIndex = Math.min(1, teams.length - 1);
+      var go = function () {
+        var a = document.getElementById("cgA").value, b = document.getElementById("cgB").value, A = teamStats(a), B = teamStats(b);
+        var pc = function (x, n) { return n ? Math.round(x / n * 100) + "%" : "—"; }, av = function (x, n) { return n ? (x / n).toFixed(2) : "—"; };
+        var rows = [["Partite analizzate", A.n, B.n], ["V - P - S", A.w + "-" + A.d + "-" + A.l, B.w + "-" + B.d + "-" + B.l],
+          ["Gol fatti (media)", av(A.gf, A.n), av(B.gf, B.n)], ["Gol subiti (media)", av(A.ga, A.n), av(B.ga, B.n)],
+          ["Over 2.5", pc(A.o25, A.n), pc(B.o25, B.n)], ["Porta inviolata", pc(A.cs, A.n), pc(B.cs, B.n)]];
+        var na = norm(a), nb = norm(b);
+        var h2h = state.resultsRows.filter(function (r) {
+          var h = norm(r.HomeTeam || r.Home), w = norm(r.AwayTeam || r.Away);
+          return ((h === na && w === nb) || (h === nb && w === na)) && r.FTHG !== undefined && r.FTHG !== "";
+        }).slice(-5);
+        document.getElementById("cgmOut").innerHTML = '<table class="cgm-t"><tr><th></th><th>' + esc(a) + "</th><th>" + esc(b) + "</th></tr>" +
+          rows.map(function (r) { return "<tr><td>" + r[0] + "</td><td>" + r[1] + "</td><td>" + r[2] + "</td></tr>"; }).join("") + "</table>" +
+          "<p class='cgm-h'>Scontri diretti (ultimi " + h2h.length + ")</p>" +
+          (h2h.length ? h2h.map(function (r) { return "<div>" + esc(r.HomeTeam || r.Home) + " " + r.FTHG + " - " + r.FTAG + " " + esc(r.AwayTeam || r.Away) + "</div>"; }).join("") : "<div>Nessun precedente nei dati caricati</div>");
+      };
+      document.getElementById("cgA").onchange = go; document.getElementById("cgB").onchange = go; go();
+      document.getElementById("cgModal").hidden = false;
+    }
+    document.getElementById("cgmClose").addEventListener("click", function () { document.getElementById("cgModal").hidden = true; });
+
+    /* 4) grafico andamento % di successo nel tempo (pagina Check) */
+    function pd(s) {
+      var m = String(s || "").match(/^(\d{1,2})[\/.\-](\d{1,2})[\/.\-](\d{2,4})$/);
+      if (m) return Date.UTC(+m[3] < 100 ? 2000 + +m[3] : +m[3], +m[2] - 1, +m[1]);
+      var t = Date.parse(s); return isNaN(t) ? 0 : t;
+    }
+    window.cgTrend = function () {
+      var I = window.cgCheckInternals, host = document.getElementById("checkLeaguesContainer");
+      if (!I || !host) return;
+      var el = document.getElementById("cgTrend");
+      if (!el) { el = document.createElement("div"); el.id = "cgTrend"; el.className = "glass-card"; host.parentNode.insertBefore(el, host); }
+      var by = {}, min = I.minPct();
+      Object.values(I.snaps()).forEach(function (s) {
+        if (!s.frozen || !s.ftResult) return;
+        var sc = I.parseScore(s.ftResult), d = pd(s.date); if (!sc || !d) return;
+        var b = by[d] || (by[d] = { real: [0, 0], dixon: [0, 0] });
+        ["real", "dixon"].forEach(function (src) {
+          ((s.picks && s.picks[src]) || []).forEach(function (p) {
+            if ((Number(p.pct) || 0) < min) return;
+            var w = I.evalLeg(p.label, sc); if (typeof w !== "boolean") return;
+            b[src][1]++; if (w) b[src][0]++;
+          });
+        });
+      });
+      var days = Object.keys(by).map(Number).sort(function (a, b) { return a - b; });
+      if (days.length < 2) { el.innerHTML = '<div class="cgt-t">📈 Andamento nel tempo</div><div class="cgt-n">Servono risultati di almeno 2 giorni diversi.</div>'; return; }
+      var W = 600, H = 160, P = 24, acc = { real: [0, 0], dixon: [0, 0] }, S = { real: [], dixon: [] };
+      days.forEach(function (d, i) {
+        ["real", "dixon"].forEach(function (k) {
+          acc[k][0] += by[d][k][0]; acc[k][1] += by[d][k][1];
+          S[k].push((P + i * (W - 2 * P) / (days.length - 1)).toFixed(1) + "," + (acc[k][1] ? (H - P - acc[k][0] / acc[k][1] * (H - 2 * P)) : H - P).toFixed(1));
+        });
+      });
+      var last = function (k) { return acc[k][1] ? Math.round(acc[k][0] / acc[k][1] * 100) + "%" : "—"; };
+      el.innerHTML = '<div class="cgt-t">📈 Andamento % di successo (cumulata)</div>' +
+        '<svg viewBox="0 0 ' + W + " " + H + '" width="100%" style="display:block"><line x1="' + P + '" y1="' + (H / 2) + '" x2="' + (W - P) + '" y2="' + (H / 2) + '" stroke="#334155" stroke-dasharray="4"/>' +
+        '<text x="2" y="' + (P + 4) + '" fill="#94a3b8" font-size="11">100%</text><text x="2" y="' + (H - P + 4) + '" fill="#94a3b8" font-size="11">0%</text>' +
+        '<polyline fill="none" stroke="#22d3ee" stroke-width="2.5" points="' + S.real.join(" ") + '"/><polyline fill="none" stroke="#facc15" stroke-width="2.5" points="' + S.dixon.join(" ") + '"/></svg>' +
+        '<div class="cgt-n"><span style="color:#22d3ee">● Reali ' + last("real") + '</span> &nbsp; <span style="color:#facc15">● Dixon-Cole ' + last("dixon") + "</span> &nbsp; (" + days.length + " giorni)</div>";
+    };
+
+    /* 5) tema + 7) notifiche + 10) backup — nel pannello Aa */
+    function applyTheme() {
+      var c = document.documentElement.classList;
+      c.toggle("cg-hc", ui.theme === "hc"); c.toggle("cg-light", ui.theme === "light");
+    }
+    applyTheme();
+    var panel = document.getElementById("cgFsPanel"), rb = document.getElementById("cgFsReset");
+    var sec = document.createElement("div");
+    sec.className = "cgfs-sec";
+    sec.innerHTML =
+      '<label>🎨 Tema <select id="cgTheme" class="cgb-in"><option value="dark">Scuro</option><option value="hc">Alto contrasto</option><option value="light">Chiaro (beta)</option></select></label>' +
+      '<label class="cgfs-chk"><input type="checkbox" id="cgNotif"> 🔔 Notifiche (nuovi risultati / % alte)</label>' +
+      '<div class="cgfs-bk"><button type="button" id="cgBkDl">💾 Backup</button><button type="button" id="cgBkUp">♻️ Ripristina</button></div>' +
+      '<input type="file" id="cgBkFile" accept=".json,application/json" hidden />';
+    panel.insertBefore(sec, rb);
+    var th = document.getElementById("cgTheme"); th.value = ui.theme;
+    th.addEventListener("change", function () { ui.theme = th.value; save(); applyTheme(); });
+    var nt = document.getElementById("cgNotif"); nt.checked = !!ui.notif && window.Notification && Notification.permission === "granted";
+    nt.addEventListener("change", function () {
+      if (!nt.checked) { ui.notif = false; save(); return; }
+      if (!window.Notification) { alert("Notifiche non supportate da questo browser"); nt.checked = false; return; }
+      Notification.requestPermission().then(function (p) { ui.notif = p === "granted"; nt.checked = ui.notif; save(); });
+    });
+    document.getElementById("cgBkDl").addEventListener("click", function () { window.downloadCheckSnapshotsJson(); });
+    document.getElementById("cgBkUp").addEventListener("click", function () { document.getElementById("cgBkFile").click(); });
+    document.getElementById("cgBkFile").addEventListener("change", function (e) {
+      var f = e.target.files[0]; if (!f) return;
+      var fr = new FileReader();
+      fr.onload = async function () {
+        try {
+          var inc = (JSON.parse(fr.result) || {}).snapshots, I = window.cgCheckInternals, cur = I.snaps(), n = 0;
+          if (!inc || typeof inc !== "object") throw 0;
+          Object.keys(inc).forEach(function (k) { if (!cur[k] || (inc[k].frozen && !cur[k].frozen)) { cur[k] = inc[k]; n++; } });
+          await I.persist(); await renderAll(); alert("Ripristino completato: " + n + " snapshot aggiunti/aggiornati.");
+        } catch (_) { alert("File non valido."); }
+        e.target.value = "";
+      };
+      fr.readAsText(f);
+    });
+
+    /* 7+8) dopo ogni caricamento: ultimo aggiornamento, offline, notifiche */
+    function banner() {
+      var el = document.getElementById("cgOff");
+      el.hidden = navigator.onLine;
+      if (!navigator.onLine) el.textContent = "📡 Offline — dati aggiornati al " + (ui.last ? new Date(ui.last).toLocaleString("it-IT") : "—");
+    }
+    window.addEventListener("online", banner); window.addEventListener("offline", banner);
+    function notify() {
+      if (!ui.notif || !window.Notification || Notification.permission !== "granted") return;
+      var done = 0, hot = [], today = getTodayStr();
+      Object.keys(state.roundsByLeague).forEach(function (lg) {
+        (state.roundsByLeague[lg] || []).forEach(function (r) {
+          r.matches.forEach(function (m) {
+            if (m.ftResult) done++;
+            else if (m.date === today && typeof window.computeMatchTopPicks === "function") {
+              var p = window.computeMatchTopPicks(m, lg, state.resultsRows), a = [].concat(p.real || [], p.dixon || []);
+              if (a.some(function (x) { return (Number(x.pct) || 0) >= 80; }) && ui.alerted.indexOf(m.id) < 0) { hot.push(m); ui.alerted.push(m.id); }
+            }
+          });
+        });
+      });
+      var msgs = [];
+      if (ui.seen && done > ui.seen) msgs.push((done - ui.seen) + " nuovi risultati");
+      if (hot.length) msgs.push(hot.length + " partite di oggi con giocata ≥ 80%");
+      ui.seen = done; ui.alerted = ui.alerted.slice(-300); save();
+      if (msgs.length) { try { new Notification("ComboGesss", { body: msgs.join(" • "), icon: "apple-touch-icon.png" }); } catch (_) {} }
+    }
+    var _ra = renderAll;
+    renderAll = async function () {
+      await _ra.apply(this, arguments);
+      mountBar();
+      if (navigator.onLine && (state.resultsRows.length || state.fixturesRows.length)) { ui.last = Date.now(); save(); }
+      banner(); notify();
+    };
+    mountBar(); banner();
+  })();
   </script>
 </body>
 </html>
