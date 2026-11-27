@@ -1268,31 +1268,37 @@
 
     const cgDB = (() => {
       let dbPromise = null;
-      const open = () => dbPromise || (dbPromise = new Promise((resolve, reject) => {
+      // Timeout: su alcuni tablet/browser IndexedDB non risponde mai e bloccava l'intero avvio
+      const withTimeout = (p, ms) => Promise.race([
+        p,
+        new Promise((_, rej) => setTimeout(() => rej(new Error("IndexedDB timeout")), ms))
+      ]);
+      const open = () => dbPromise || (dbPromise = withTimeout(new Promise((resolve, reject) => {
         const req = indexedDB.open("combogesss", 1);
         req.onupgradeneeded = () => req.result.createObjectStore("kv");
         req.onsuccess = () => resolve(req.result);
         req.onerror = () => reject(req.error);
-      }));
+        req.onblocked = () => reject(new Error("IndexedDB bloccato"));
+      }), 4000).catch((e) => { dbPromise = null; throw e; }));
       return {
         async set(key, value) {
           try {
             const db = await open();
-            await new Promise((res, rej) => {
+            await withTimeout(new Promise((res, rej) => {
               const tx = db.transaction("kv", "readwrite");
               tx.objectStore("kv").put(value, key);
               tx.oncomplete = res; tx.onerror = () => rej(tx.error); tx.onabort = () => rej(tx.error);
-            });
+            }), 8000);
             return true;
           } catch (e) { console.warn("Cache locale non salvata:", e); return false; }
         },
         async get(key) {
           try {
             const db = await open();
-            return await new Promise((res, rej) => {
+            return await withTimeout(new Promise((res, rej) => {
               const r = db.transaction("kv").objectStore("kv").get(key);
               r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error);
-            });
+            }), 8000);
           } catch (e) { return undefined; }
         }
       };
@@ -2130,8 +2136,13 @@
       window.addEventListener("DOMContentLoaded", async () => {
         updateClock();
         setInterval(updateClock, 1000);
-        await loadSnapshotsFromStorageAndGitHub();
-        await autoLoadComboGesssData();
+        try { await loadSnapshotsFromStorageAndGitHub(); }
+        catch (e) { console.warn("Snapshot non caricati:", e); }
+        try { await autoLoadComboGesssData(); }
+        catch (e) {
+          console.error("Caricamento dati fallito:", e);
+          try { await renderAll(); } catch (_) {}
+        }
       });
     })();
 
