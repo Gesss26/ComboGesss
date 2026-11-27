@@ -1,65 +1,58 @@
-import json, os, re
+import json, os, re, time
 from datetime import datetime, timedelta, timezone
 from urllib.parse import urljoin
 import pandas as pd
 import requests
 
 FD_URL = "https://" + "www.football-data.co.uk/"
-OF_URL = "https://" + "://githubusercontent.com"
+SV_URL = "https://" + "giochi.softvision.it/Campionati-Calcio/Calendario/"
 SEASON = "2627"
 OUT = "data"
 EURO_XLSX = "all-euro-data-2026-2027.xlsx"
-HDR = {"User-Agent": "Mozilla/5.0"}
+HDR = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
 
+# Codice -> (Nazione, Bandiera, Nome Campionato, Slug Softvision)
 LEAGUES = {
-    "I1": ("Italia", "🇮🇹", "Serie A", "it.1.json"),
-    "I2": ("Italia", "🇮🇹", "Serie B", "it.2.json"),
-    "E0": ("Inghilterra", "🏴󠁧󠁢󠁥󠁮󠁧󠁿", "Premier League", "en.1.json"),
-    "E1": ("Inghilterra", "🏴󠁧󠁢󠁥󠁮󠁧󠁿", "Championship", "en.2.json"),
-    "E2": ("Inghilterra", "🏴󠁧󠁢󠁥󠁮󠁧󠁿", "League One", "en.3.json"),
-    "E3": ("Inghilterra", "🏴󠁧󠁢󠁥󠁮󠁧󠁿", "League Two", "en.4.json"),
-    "EC": ("Inghilterra", "🏴󠁧󠁢󠁥󠁮󠁧󠁿", "National League", None),
-    "SC0": ("Scozia", "🏴󠁧󠁢󠁳󠁣󠁴󠁿", "Premiership", "sco.1.json"),
-    "SC1": ("Scozia", "🏴󠁧󠁢󠁳󠁣󠁴󠁿", "Championship", None),
-    "SC2": ("Scozia", "🏴󠁧󠁢󠁳󠁣󠁴󠁿", "League One", None),
-    "SC3": ("Scozia", "🏴󠁧󠁢󠁳󠁣󠁴󠁿", "League Two", None),
-    "SP1": ("Spagna", "🇪🇸", "La Liga", "es.1.json"),
-    "SP2": ("Spagna", "🇪🇸", "Segunda Division", "es.2.json"),
-    "D1": ("Germania", "🇩🇪", "Bundesliga", "de.1.json"),
-    "D2": ("Germania", "🇩🇪", "2. Bundesliga", "de.2.json"),
-    "F1": ("Francia", "🇫🇷", "Ligue 1", "fr.1.json"),
-    "F2": ("Francia", "🇫🇷", "Ligue 2", "fr.2.json"),
-    "N1": ("Paesi Bassi", "🇳🇱", "Eredivisie", "nl.1.json"),
-    "B1": ("Belgio", "🇧🇪", "Pro League", "be.1.json"),
-    "P1": ("Portogallo", "🇵🇹", "Liga Portugal", "pt.1.json"),
-    "T1": ("Turchia", "🇹🇷", "Super Lig", "tr.1.json"),
-    "G1": ("Grecia", "🇬🇷", "Super League", "gr.1.json"),
+    "I1": ("Italia", "🇮🇹", "Serie A", "Italia/Serie-A"),
+    "I2": ("Italia", "🇮🇹", "Serie B", "Italia/Serie-B"),
+    "E0": ("Inghilterra", "🏴󠁧󠁢󠁥󠁮󠁧󠁿", "Premier League", "Inghilterra/Premiere-League"),
+    "E1": ("Inghilterra", "🏴󠁧󠁢󠁥󠁮󠁧󠁿", "Championship", "Inghilterra/Championship"),
+    "E2": ("Inghilterra", "🏴󠁧󠁢󠁥󠁮󠁧󠁿", "League One", "Inghilterra/League-One"),
+    "E3": ("Inghilterra", "🏴󠁧󠁢󠁥󠁮󠁧󠁿", "League Two", "Inghilterra/League-Two"),
+    "EC": ("Inghilterra", "🏴󠁧󠁢󠁥󠁮󠁧󠁿", "National League", "Inghilterra/Conference"),
+    "SC0": ("Scozia", "🏴󠁧󠁢󠁳󠁣󠁴󠁿", "Premiership", "Scozia/Premier-League"),
+    "SC1": ("Scozia", "🏴󠁧󠁢󠁳󠁣󠁴󠁿", "Championship", "Scozia/First-Division"),
+    "SC2": ("Scozia", "🏴󠁧󠁢󠁳󠁣󠁴󠁿", "League One", "Scozia/Second-Division"),
+    "SC3": ("Scozia", "🏴󠁧󠁢󠁳󠁣󠁴󠁿", "League Two", "Scozia/Third-Division"),
+    "SP1": ("Spagna", "🇪🇸", "La Liga", "Spagna/Spagna-Liga-1"),
+    "SP2": ("Spagna", "🇪🇸", "Segunda Division", "Spagna/Spagna-Liga-2"),
+    "D1": ("Germania", "🇩🇪", "Bundesliga", "Germania/Bundesliga-1"),
+    "D2": ("Germania", "🇩🇪", "2. Bundesliga", "Germania/Bundesliga-2"),
+    "F1": ("Francia", "🇫🇷", "Ligue 1", "Francia/Le-Championnat"),
+    "F2": ("Francia", "🇫🇷", "Ligue 2", "Francia/Ligue-2"),
+    "N1": ("Paesi Bassi", "🇳🇱", "Eredivisie", "Olanda/Eredivisie"),
+    "B1": ("Belgio", "🇧🇪", "Pro League", "Belgio/Jupiler-League"),
+    "P1": ("Portogallo", "🇵🇹", "Liga Portugal", "Portogallo/Superliga"),
+    "T1": ("Turchia", "🇹🇷", "Super Lig", "Turchia/Super-Lig"),
+    "G1": ("Grecia", "🇬🇷", "Super League", "Grecia/Ethniki-Katigoria"),
 }
 
 ALIASES = {
-    "fc internazionale milano": "Inter", "internazionale": "Inter", "ac milan": "Milan",
-    "juventus fc": "Juventus", "ssc napoli": "Napoli", "as roma": "Roma", "ss lazio": "Lazio",
-    "atalanta bc": "Atalanta", "acf fiorentina": "Fiorentina", "bologna fc 1909": "Bologna",
-    "torino fc": "Torino", "udinese calcio": "Udinese", "genoa cfc": "Genoa",
-    "cagliari calcio": "Cagliari", "hellas verona fc": "Verona", "us lecce": "Lecce",
-    "parma calcio 1913": "Parma", "como 1907": "Como", "ac monza": "Monza", "venezia fc": "Venezia",
-    "empoli fc": "Empoli", "us sassuolo calcio": "Sassuolo", "frosinone calcio": "Frosinone",
-    "manchester united fc": "Man United", "manchester city fc": "Man City",
-    "tottenham hotspur fc": "Tottenham", "newcastle united fc": "Newcastle",
-    "west ham united fc": "West Ham", "wolverhampton wanderers fc": "Wolves",
-    "nottingham forest fc": "Nott'm Forest", "brighton & hove albion fc": "Brighton",
-    "leicester city fc": "Leicester", "ipswich town fc": "Ipswich", "afc bournemouth": "Bournemouth",
-    "crystal palace fc": "Crystal Palace", "aston villa fc": "Aston Villa", "arsenal fc": "Arsenal",
-    "chelsea fc": "Chelsea", "liverpool fc": "Liverpool", "everton fc": "Everton",
-    "fulham fc": "Fulham", "brentford fc": "Brentford", "southampton fc": "Southampton",
-    "real madrid cf": "Real Madrid", "fc barcelona": "Barcelona", "club atlético de madrid": "Ath Madrid",
-    "athletic club": "Ath Bilbao", "real sociedad de fútbol": "Sociedad", "real betis balompié": "Betis",
-    "villarreal cf": "Villarreal", "sevilla fc": "Sevilla", "valencia cf": "Valencia",
-    "rc celta de vigo": "Celta", "fc bayern münchen": "Bayern Munich", "borussia dortmund": "Dortmund",
-    "bayer 04 leverkusen": "Leverkusen", "rb leipzig": "RB Leipzig", "eintracht frankfurt": "Ein Frankfurt",
-    "vfb stuttgart": "Stuttgart", "borussia mönchengladbach": "M'gladbach",
-    "paris saint-germain fc": "Paris SG", "olympique de marseille": "Marseille",
-    "olympique lyonnais": "Lyon", "as monaco fc": "Monaco", "lille osc": "Lille", "ogc nice": "Nice",
+    "man utd": "Man United", "manchester utd": "Man United", "manchester united": "Man United",
+    "man city": "Man City", "manchester city": "Man City",
+    "nottm forest": "Nott'm Forest", "nottingham forest": "Nott'm Forest", "nottingham": "Nott'm Forest",
+    "wolverhampton": "Wolves", "west ham": "West Ham", "tottenham": "Tottenham",
+    "brighton": "Brighton", "leicester": "Leicester", "newcastle": "Newcastle",
+    "sheffield utd": "Sheffield United", "sheffield wed": "Sheffield Weds",
+    "atletico madrid": "Ath Madrid", "atl. madrid": "Ath Madrid",
+    "athletic bilbao": "Ath Bilbao", "ath. bilbao": "Ath Bilbao",
+    "real sociedad": "Sociedad", "real betis": "Betis", "celta vigo": "Celta",
+    "rayo vallecano": "Vallecano", "espanyol": "Espanol", "alaves": "Alaves", "leganes": "Leganes",
+    "bayern monaco": "Bayern Munich", "bayern": "Bayern Munich",
+    "borussia dortmund": "Dortmund", "bayer leverkusen": "Leverkusen",
+    "eintracht francoforte": "Ein Frankfurt", "monchengladbach": "M'gladbach", "b. monchengladbach": "M'gladbach",
+    "st. pauli": "St Pauli", "psg": "Paris SG", "paris saint germain": "Paris SG",
+    "st. etienne": "St Etienne", "saint etienne": "St Etienne",
 }
 
 def ndate(v):
@@ -67,7 +60,7 @@ def ndate(v):
     if isinstance(v, (pd.Timestamp, datetime)): return v.strftime("%d/%m/%Y")
     if isinstance(v, (int, float)): return (datetime(1899, 12, 30, tzinfo=timezone.utc) + timedelta(days=int(float(v)))).strftime("%d/%m/%Y")
     s = str(v).strip()
-    p = re.split(r"[\sT]+", s)[0]
+    p = re.split(r"[\sT]+", s)
     m = re.fullmatch(r"(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})", p)
     if m: return f"{int(m.group(1)):02d}/{int(m.group(2)):02d}/{int(m.group(3)) + (2000 if int(m.group(3)) < 100 else 0):04d}"
     m = re.fullmatch(r"(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})", p)
@@ -79,24 +72,48 @@ def nteam(raw, known):
     low = c.lower()
     if low in ALIASES: return ALIASES[low]
     if low in known: return known[low]
-    st = re.sub(r"\s+", " ", re.sub(r"\b(fc|cf|ac|as|ss|ssc|us|uc|ud|cd|rc|rcd|sc|vfb|vfl|tsg|sv|fsv|1\.)\b", "", low)).strip()
-    if st in known: return known[st]
     for k, orig in known.items():
-        if k in st or st in k: return orig
+        if k in low or low in k: return orig
     return c
 
 def dl(url, dest):
     try:
         r = requests.get(url, headers=HDR, timeout=25)
-        if r.status_code != 200:
-            print(f"[HTTP {r.status_code}] {url}")
-            return False
+        if r.status_code != 200: return False
         with open(dest, "wb") as f: f.write(r.content)
-        print(f"[OK] {os.path.basename(dest)}")
         return True
-    except Exception as e:
-        print(f"[ERR] {url}: {e}")
+    except Exception:
         return False
+
+def fetch_softvision(slug, code, known, played):
+    if not slug: return []
+    url = urljoin(SV_URL, slug)
+    try:
+        r = requests.get(url, headers=HDR, timeout=25)
+        if r.status_code != 200:
+            print(f"[SV HTTP {r.status_code}] {url}")
+            return []
+        tables = pd.read_html(r.text)
+        out = []
+        for t in tables:
+            if t.shape[1] < 3: continue
+            for _, row in t.iterrows():
+                c0 = str(row.iloc).strip()
+                c1 = str(row.iloc).strip()
+                c2 = str(row.iloc).strip() if pd.notna(row.iloc) else ""
+                if re.fullmatch(r"\d{2}/\d{2}/\d{4}", c0) and " - " in c1:
+                    # Se c2 non contiene un risultato (es. "2 - 1"), è una partita futura
+                    if not re.search(r"\d+\s*-\s*\d+", c2):
+                        parts = c1.split(" - ", 1)
+                        h = nteam(parts, known)
+                        a = nteam(parts, known)
+                        if (h.lower(), a.lower()) not in played:
+                            out.append({"Div": code, "Date": c0, "Time": "15:00", "HomeTeam": h, "AwayTeam": a})
+        print(f"[SV OK] {code}: +{len(out)} partite future")
+        return out
+    except Exception as e:
+        print(f"[SV ERR] {code}: {e}")
+        return []
 
 def main():
     os.makedirs(OUT, exist_ok=True)
@@ -116,7 +133,7 @@ def main():
         if "Date" in fd_fix.columns: fd_fix["Date"] = fd_fix["Date"].apply(ndate)
 
     frames, extra = [], []
-    for code, (country, flag, name, of_file) in LEAGUES.items():
+    for code, (country, flag, name, sv_slug) in LEAGUES.items():
         csv_path = os.path.join(OUT, f"{code}.csv")
         known, played = {}, set()
         if dl(f"{FD_URL}mmz4281/{SEASON}/{code}.csv", csv_path):
@@ -131,34 +148,20 @@ def main():
                 if a: known[a.lower()] = a
                 if pd.notna(r.get("FTHG")) and pd.notna(r.get("FTAG")): played.add((h.lower(), a.lower()))
 
-        if of_file:
-            try:
-                res = requests.get(urljoin(OF_URL, of_file), headers=HDR, timeout=20)
-                if res.status_code == 200:
-                    for m in res.json().get("matches", []):
-                        if m.get("score", {}).get("ft"): continue
-                        d_str = ndate(m.get("date", ""))
-                        h, a = nteam(m.get("team1", ""), known), nteam(m.get("team2", ""), known)
-                        if d_str and (h.lower(), a.lower()) not in played:
-                            t_raw = str(m.get("time", "")).strip()
-                            extra.append({"Div": code, "Date": d_str, "Time": t_raw[:5] if re.match(r"^\d{1,2}:\d{2}", t_raw) else "15:00", "HomeTeam": h, "AwayTeam": a})
-            except Exception as e:
-                print(f"[OF ERR] {code}: {e}")
+        extra.extend(fetch_softvision(sv_slug, code, known, played))
+        time.sleep(0.5)
 
     if frames:
         all_df = pd.concat(frames, ignore_index=True)
         all_df.to_csv(os.path.join(OUT, "all_leagues.csv"), index=False, encoding="utf-8")
-        if not os.path.exists(euro_path):
-            with pd.ExcelWriter(euro_path, engine="openpyxl") as w:
-                for c_code, grp in all_df.groupby("DivCode"): grp.to_excel(w, sheet_name=str(c_code), index=False)
 
-    of_df = pd.DataFrame(extra) if extra else pd.DataFrame(columns=["Div", "Date", "Time", "HomeTeam", "AwayTeam"])
+    sv_df = pd.DataFrame(extra) if extra else pd.DataFrame(columns=["Div", "Date", "Time", "HomeTeam", "AwayTeam"])
     if not fd_fix.empty and {"Div", "HomeTeam", "AwayTeam"}.issubset(fd_fix.columns):
         ex = set(zip(fd_fix["Div"].astype(str).str.upper(), fd_fix["HomeTeam"].astype(str).str.lower(), fd_fix["AwayTeam"].astype(str).str.lower()))
-        of_df = of_df[~of_df.apply(lambda r: (r["Div"].upper(), r["HomeTeam"].lower(), r["AwayTeam"].lower()) in ex, axis=1)]
-        final_fix = pd.concat([fd_fix, of_df], ignore_index=True)
+        sv_df = sv_df[~sv_df.apply(lambda r: (r["Div"].upper(), r["HomeTeam"].lower(), r["AwayTeam"].lower()) in ex, axis=1)]
+        final_fix = pd.concat([fd_fix, sv_df], ignore_index=True)
     else:
-        final_fix = of_df
+        final_fix = sv_df
     final_fix.to_excel(fix_path, index=False, engine="openpyxl")
     print(f"=== Completato: {len(frames)} leghe, {len(final_fix)} partite future ===")
 
