@@ -84,6 +84,7 @@
     document.body.classList.add("cg-v-" + v);
     current = v;
     if (v === "home") refreshHome();
+    else if (v === "palinsesto") mountHeaderButton();
     else if (v === "conto" && window.CGConto) window.CGConto.render($("#cg-conto-body"));
     else if (v === "impostazioni") renderSettings();
     window.scrollTo(0, 0);
@@ -134,3 +135,4 @@
           <label>Quota target<input id="sd-target" type="number" step="0.1" min="1.2" value="${D.target}"></label>
           <label>Tolleranza${sel("sd-tol", O.tol, D.tol)}</label>
           <label>Eventi min${sel("sd-minLegs", O.min, D.minLegs)}</label>
+
