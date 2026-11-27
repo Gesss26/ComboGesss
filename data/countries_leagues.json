@@ -50,14 +50,6 @@
       {
         "code": "SC1",
         "name": "Championship"
-      },
-      {
-        "code": "SC2",
-        "name": "League One"
-      },
-      {
-        "code": "SC3",
-        "name": "League Two"
       }
     ]
   },
