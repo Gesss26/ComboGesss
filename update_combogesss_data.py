@@ -11,7 +11,6 @@ OUT = "data"
 EURO_XLSX = "all-euro-data-2026-2027.xlsx"
 HDR = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
 
-# Codice -> (Nazione, Bandiera, Nome Campionato, Slug Softvision)
 LEAGUES = {
     "I1": ("Italia", "🇮🇹", "Serie A", "Italia/Serie-A"),
     "I2": ("Italia", "🇮🇹", "Serie B", "Italia/Serie-B"),
@@ -58,13 +57,18 @@ ALIASES = {
 def ndate(v):
     if v is None or (isinstance(v, float) and pd.isna(v)): return ""
     if isinstance(v, (pd.Timestamp, datetime)): return v.strftime("%d/%m/%Y")
-    if isinstance(v, (int, float)): return (datetime(1899, 12, 30, tzinfo=timezone.utc) + timedelta(days=int(float(v)))).strftime("%d/%m/%Y")
+    if isinstance(v, (int, float)):
+        return (datetime(1899, 12, 30, tzinfo=timezone.utc) + timedelta(days=int(float(v)))).strftime("%d/%m/%Y")
     s = str(v).strip()
-    p = re.split(r"[\sT]+", s)
+    if not s or s.lower() in {"nan", "nat", "none"}: return ""
+    p = s.replace("T", " ").split().pop(0)
     m = re.fullmatch(r"(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})", p)
-    if m: return f"{int(m.group(1)):02d}/{int(m.group(2)):02d}/{int(m.group(3)) + (2000 if int(m.group(3)) < 100 else 0):04d}"
+    if m:
+        y = int(m.group(3)) + (2000 if int(m.group(3)) < 100 else 0)
+        return f"{int(m.group(1)):02d}/{int(m.group(2)):02d}/{y:04d}"
     m = re.fullmatch(r"(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})", p)
-    if m: return f"{int(m.group(3)):02d}/{int(m.group(2)):02d}/{int(m.group(1)):04d}"
+    if m:
+        return f"{int(m.group(3)):02d}/{int(m.group(2)):02d}/{int(m.group(1)):04d}"
     return s
 
 def nteam(raw, known):
@@ -96,17 +100,17 @@ def fetch_softvision(slug, code, known, played):
         tables = pd.read_html(r.text)
         out = []
         for t in tables:
-            if t.shape[1] < 3: continue
+            if t.shape.pop(1) < 3: continue
             for _, row in t.iterrows():
-                c0 = str(row.iloc).strip()
-                c1 = str(row.iloc).strip()
-                c2 = str(row.iloc).strip() if pd.notna(row.iloc) else ""
+                vals = list(row)
+                c0 = str(vals.pop(0)).strip()
+                c1 = str(vals.pop(0)).strip()
+                c2 = str(vals.pop(0)).strip() if vals and pd.notna(vals.pop(0)) else ""
                 if re.fullmatch(r"\d{2}/\d{2}/\d{4}", c0) and " - " in c1:
-                    # Se c2 non contiene un risultato (es. "2 - 1"), è una partita futura
                     if not re.search(r"\d+\s*-\s*\d+", c2):
-                        parts = c1.split(" - ", 1)
-                        h = nteam(parts, known)
-                        a = nteam(parts, known)
+                        h_raw, a_raw = c1.split(" - ", 1)
+                        h = nteam(h_raw, known)
+                        a = nteam(a_raw, known)
                         if (h.lower(), a.lower()) not in played:
                             out.append({"Div": code, "Date": c0, "Time": "15:00", "HomeTeam": h, "AwayTeam": a})
         print(f"[SV OK] {code}: +{len(out)} partite future")
