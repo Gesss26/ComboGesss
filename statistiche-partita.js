@@ -1119,7 +1119,7 @@
       "box-shadow:0 8px 24px rgba(2,12,30,0.6);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);touch-action:manipulation;";
     floating.innerHTML = `
       <button id="backToMatchesBtn" type="button" style="${btnCss}background:rgba(8,145,178,0.92);">
-        <span>←</span><span>Torna al Menù</span>
+        <span>←</span><span>Torna indietro</span>
       </button>
       <button id="scrollTopBtn" type="button" style="${btnCss}background:rgba(15,23,42,0.88);">
         <span>↑</span><span>Torna in cima</span>
