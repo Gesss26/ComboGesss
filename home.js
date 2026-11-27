@@ -1,4 +1,4 @@
-/* ComboGesss — Home (Conto, Palinsesto, Schedina, Impostazioni) + router + impostazioni */
+/* ComboGesss — Home (Conto con Password, Palinsesto, Schedina, Impostazioni) */
 (function () {
   "use strict";
 
@@ -6,12 +6,14 @@
   const SKEY = "combogesss_settings";
   const KEYS = ["combogesss_conto", "combogesss_schedine", "combogesss_schedina_defaults", SKEY];
   let current = "home";
+  let contoUnlocked = false;
 
   const $ = (s, r) => (r || document).querySelector(s);
   const esc = s => String(s == null ? "" : s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
   function loadSet() { try { return JSON.parse(localStorage.getItem(SKEY) || "{}") || {}; } catch (_) { return {}; } }
   function saveSet(o) { try { localStorage.setItem(SKEY, JSON.stringify(o)); } catch (_) {} }
   function savedCount() { try { return (JSON.parse(localStorage.getItem("combogesss_schedine") || "[]") || []).length; } catch (_) { return 0; } }
+  function getContoPin() { return String(loadSet().contoPin || "").trim(); }
 
   const css = document.createElement("style");
   css.textContent = `
@@ -39,10 +41,13 @@
     .cg-card { background: rgba(7,26,54,.72); border: 1px solid rgba(56,189,248,.24); border-radius: 14px; padding: 14px; margin-bottom: 14px; }
     .cg-set { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; margin-top: 10px; }
     .cg-set label { display: flex; flex-direction: column; gap: 4px; font-size:calc(10px * var(--cg-fs,1)); text-transform: uppercase; letter-spacing: .06em; color: #86b3d8; }
-    .cg-set input[type=text], .cg-set input[type=number], .cg-set select { background: rgba(2,12,30,.8); color: #e6f4ff; border: 1px solid rgba(56,189,248,.3); border-radius: 8px; padding: 7px 8px; font-size:calc(13px * var(--cg-fs,1)); font-family: inherit; text-transform: none; letter-spacing: 0; }
+    .cg-set input[type=text], .cg-set input[type=password], .cg-set input[type=number], .cg-set select { background: rgba(2,12,30,.8); color: #e6f4ff; border: 1px solid rgba(56,189,248,.3); border-radius: 8px; padding: 7px 8px; font-size:calc(13px * var(--cg-fs,1)); font-family: inherit; text-transform: none; letter-spacing: 0; }
     .cg-set .cg-chk { flex-direction: row; align-items: center; gap: 8px; text-transform: none; letter-spacing: 0; font-size:calc(13px * var(--cg-fs,1)); color: #e6f4ff; }
     .cg-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
     .cg-hint { font-size:calc(11px * var(--cg-fs,1)); color: #86b3d8; margin-top: 8px; }
+    .cg-lockbox { max-width: 380px; margin: 40px auto; text-align: center; padding: 24px 18px; }
+    .cg-lockbox input { width: 100%; box-sizing: border-box; text-align: center; font-size: 18px; letter-spacing: .15em; margin: 12px 0; padding: 10px; border-radius: 10px; border: 1px solid rgba(56,189,248,.4); background: rgba(2,12,30,.9); color: #fff; }
+    .cg-lock-err { color: #f87171; font-size: 12px; min-height: 18px; margin-bottom: 8px; }
     body.cg-reduce *, body.cg-reduce *::before, body.cg-reduce *::after { animation: none !important; transition: none !important; }
     body.cg-reduce #techBgLayer { display: none; }
     @media (max-width: 520px) { .cg-tile { min-height: 140px; padding: 13px; } .cg-hero h1 { font-size:calc(22px * var(--cg-fs,1)); } }
@@ -59,11 +64,47 @@
   function build() {
     const mk = (id, html) => { const d = document.createElement("section"); d.id = id; d.className = "cg-page"; d.innerHTML = html; document.body.appendChild(d); return d; };
     mk("cg-home", `<div class="cg-wrap"><div class="cg-hero"><div style="font-size:calc(44px * var(--cg-fs,1))">⚽</div><h1>ComboGesss</h1><p>Statistiche calcio europee 2026/27</p><div id="cg-h-status"></div></div><div class="cg-grid">${TILES.map(x => `<button class="cg-tile" style="--c:${x.c}" data-go="${x.go}"><span class="cg-ico">${x.ico}</span><span class="cg-t">${x.t}</span><span class="cg-s" id="${x.sid}">…</span></button>`).join("")}</div><div class="cg-foot" id="cg-h-foot"></div></div>`);
-    mk("cg-conto", `<div class="cg-wrap"><div class="cg-bar"><button class="cg-btn" data-go="home">← Home</button><h2>💰 Conto</h2></div><div id="cg-conto-body"></div></div>`);
+    mk("cg-conto", `<div class="cg-wrap"><div class="cg-bar"><button class="cg-btn" data-go="home">← Home</button><h2>💰 Conto</h2><button id="cg-lock-now" class="cg-btn" style="margin-left:auto;display:none" type="button">🔒 Blocca</button></div><div id="cg-conto-body"></div></div>`);
     mk("cg-imp", `<div class="cg-wrap"><div class="cg-bar"><button class="cg-btn" data-go="home">← Home</button><h2>⚙️ Impostazioni</h2></div><div id="cg-imp-body"></div></div>`);
     document.addEventListener("click", ev => { const t = ev.target.closest("[data-go]"); if (t) nav(t.dataset.go); });
+    $("#cg-lock-now").addEventListener("click", () => { contoUnlocked = false; renderContoProtected(); });
   }
 
+  function renderContoProtected() {
+    const pin = getContoPin();
+    const lockBtn = $("#cg-lock-now");
+    if (lockBtn) lockBtn.style.display = (pin && contoUnlocked) ? "inline-block" : "none";
+
+    if (!pin || contoUnlocked) {
+      if (window.CGConto) window.CGConto.render($("#cg-conto-body"));
+      return;
+    }
+
+    $("#cg-conto-body").innerHTML = `
+      <div class="cg-card cg-lockbox">
+        <div style="font-size:38px">🔒</div>
+        <h3 style="margin:8px 0 4px;font-family:Orbitron,sans-serif">Area Conto Protetta</h3>
+        <div class="cg-hint">Inserisci la password per visualizzare saldo e movimenti.</div>
+        <input id="cg-pin-in" type="password" placeholder="Password / PIN" autocomplete="current-password">
+        <div id="cg-pin-err" class="cg-lock-err"></div>
+        <button id="cg-pin-go" class="cg-btn cg-primary" style="width:100%" type="button">🔓 Sblocca Conto</button>
+      </div>`;
+
+    const check = () => {
+      const val = ($("#cg-pin-in").value || "").trim();
+      if (val === pin) {
+        contoUnlocked = true;
+        renderContoProtected();
+      } else {
+        $("#cg-pin-err").textContent = "Password errata. Riprova.";
+        $("#cg-pin-in").value = "";
+        $("#cg-pin-in").focus();
+      }
+    };
+    $("#cg-pin-go").addEventListener("click", check);
+    $("#cg-pin-in").addEventListener("keydown", e => { if (e.key === "Enter") check(); });
+    setTimeout(() => { const inp = $("#cg-pin-in"); if (inp) inp.focus(); }, 50);
+  }
   function go(v) {
     if (v === "schedina") { if (window.CGSchedina) window.CGSchedina.open(); return; }
     if (!VIEWS.includes(v)) v = "home";
@@ -72,7 +113,7 @@
     current = v;
     if (v === "home") refreshHome();
     else if (v === "palinsesto") mountHeaderButton();
-    else if (v === "conto" && window.CGConto) window.CGConto.render($("#cg-conto-body"));
+    else if (v === "conto") renderContoProtected();
     else if (v === "impostazioni") renderSettings();
     window.scrollTo(0, 0);
   }
@@ -84,7 +125,13 @@
   }
   function refreshHome() {
     const set = (id, t) => { const e = document.getElementById(id); if (e) e.textContent = t; };
-    if (window.CGConto) { const s = window.CGConto.getSummary(), f = window.CGConto.fmt; set("cg-s-conto", `Saldo ${f(s.balance)} · P/L ${f(s.pl, true)}`); }
+    const pin = getContoPin();
+    if (pin && !contoUnlocked) {
+      set("cg-s-conto", "🔒 Protetto da password");
+    } else if (window.CGConto) {
+      const s = window.CGConto.getSummary(), f = window.CGConto.fmt;
+      set("cg-s-conto", `Saldo ${f(s.balance)} · P/L ${f(s.pl, true)}`);
+    }
     let pal = "Caricamento dati…";
     try {
       const rbl = state.roundsByLeague || {}, keys = Object.keys(rbl);
@@ -97,16 +144,35 @@
     set("cg-s-pal", pal);
     const d = window.CGSchedina ? window.CGSchedina.getDefaults() : { target: 3 };
     set("cg-s-sch", `Genera a quota ${d.target} · ${savedCount()} salvate`);
-    set("cg-s-imp", "Preferenze, backup e dati");
+    set("cg-s-imp", "Preferenze, sicurezza e dati");
     const st = document.getElementById("dataStatusText"); set("cg-h-status", st ? st.textContent.trim().slice(0, 90) : "");
     const v = document.getElementById("appVersion"); set("cg-h-foot", v ? v.textContent : "");
   }
+
   function sel(id, opts, cur) { return `<select id="${id}">${opts.map(([v, l]) => `<option value="${v}" ${String(v) === String(cur) ? "selected" : ""}>${l}</option>`).join("")}</select>`; }
 
   function renderSettings() {
-    const S = loadSet(), O = window.CGSchedina ? window.CGSchedina.OPTS : null, D = window.CGSchedina ? window.CGSchedina.getDefaults() : null;
+    const S = loadSet(), pin = getContoPin();
+    const O = window.CGSchedina ? window.CGSchedina.OPTS : null, D = window.CGSchedina ? window.CGSchedina.getDefaults() : null;
     const sched = O ? `<div class="cg-card"><h3>🎟️ Schedina — valori predefiniti</h3><div class="cg-set"><label>Quota target<input id="sd-target" type="number" step="0.1" min="1.2" value="${D.target}"></label><label>Tolleranza${sel("sd-tol", O.tol, D.tol)}</label><label>Eventi min${sel("sd-minLegs", O.min, D.minLegs)}</label><label>Eventi max${sel("sd-maxLegs", O.max, D.maxLegs)}</label><label>Modalità${sel("sd-mode", O.mode, D.mode)}</label><label>Fonte stime${sel("sd-source", O.source, D.source)}</label><label>Ambito${sel("sd-scope", O.scope, D.scope)}</label><label>Prob. minima${sel("sd-minPct", O.pct, D.minPct)}</label><label class="cg-chk"><input id="sd-includeFair" type="checkbox" ${D.includeFair ? "checked" : ""}> Includi quote equa</label></div><div class="cg-row"><button class="cg-btn" data-set="resetdef">↺ Ripristina valori di fabbrica</button></div><div class="cg-hint">Si salvano da soli e vengono usati ogni volta che apri il generatore.</div></div>` : "";
-    $("#cg-imp-body").innerHTML = `<div class="cg-card"><h3>🧭 Generale</h3><div class="cg-set"><label>Schermata di avvio${sel("st-start", [["home", "🏠 Home"], ["palinsesto", "📅 Palinsesto"]], S.startView || "home")}</label><label>Simbolo valuta${sel("st-cur", [["€", "€ Euro"], ["$", "$ Dollaro"], ["£", "£ Sterlina"], ["CHF", "CHF Franco"]], S.currency || "€")}</label><label class="cg-chk"><input id="st-motion" type="checkbox" ${S.reduceMotion ? "checked" : ""}> Riduci animazioni (telefoni lenti)</label></div></div>${window.cgAppearance ? window.cgAppearance.html() : ""}${sched}<div class="cg-card"><h3>💾 Dati e backup</h3><div class="cg-row"><button class="cg-btn cg-primary" data-set="export">⬇️ Esporta backup (JSON)</button><button class="cg-btn" data-set="import">⬆️ Importa backup</button><input id="st-file" type="file" accept="application/json,.json" style="display:none"></div><div class="cg-row"><button class="cg-btn cg-danger" data-set="wipe-conto">🗑️ Cancella Conto</button><button class="cg-btn cg-danger" data-set="wipe-sched">🗑️ Cancella schedine salvate</button><button class="cg-btn cg-danger" data-set="wipe-all">⚠️ Cancella tutto</button></div><div class="cg-hint">I dati restano solo su questo dispositivo (localStorage). Esporta un backup prima di cambiare telefono o browser.</div></div><div class="cg-card"><h3>ℹ️ App</h3><div class="cg-hint" style="margin-top:0">${esc((document.getElementById("appVersion") || {}).textContent || "")} · ${esc(((document.getElementById("dataStatusText") || {}).textContent || "").trim().slice(0, 120))}</div><div class="cg-row"><button class="cg-btn" data-set="refresh">🔄 Aggiorna app (svuota cache)</button></div></div>`;
+
+    $("#cg-imp-body").innerHTML = `
+      <div class="cg-card"><h3>🔒 Sicurezza Conto</h3>
+        <div class="cg-set">
+          <label>${pin ? "Nuova password Conto" : "Imposta password Conto"}<input id="sec-pin" type="password" placeholder="Inserisci password o PIN"></label>
+          <label>Conferma password<input id="sec-pin2" type="password" placeholder="Ripeti password"></label>
+        </div>
+        <div class="cg-row">
+          <button class="cg-btn cg-primary" data-set="save-pin">💾 Salva password</button>
+          ${pin ? `<button class="cg-btn cg-danger" data-set="del-pin">🔓 Rimuovi password</button>` : ""}
+        </div>
+        <div class="cg-hint">${pin ? "Password attiva: il Conto richiede lo sblocco all'apertura." : "Nessuna password impostata: il Conto è attualmente libero."}</div>
+      </div>
+      <div class="cg-card"><h3>🧭 Generale</h3><div class="cg-set"><label>Schermata di avvio${sel("st-start", [["home", "🏠 Home"], ["palinsesto", "📅 Palinsesto"]], S.startView || "home")}</label><label>Simbolo valuta${sel("st-cur", [["€", "€ Euro"], ["$", "$ Dollaro"], ["£", "£ Sterlina"], ["CHF", "CHF Franco"]], S.currency || "€")}</label><label class="cg-chk"><input id="st-motion" type="checkbox" ${S.reduceMotion ? "checked" : ""}> Riduci animazioni (telefoni lenti)</label></div></div>
+      ${window.cgAppearance ? window.cgAppearance.html() : ""}
+      ${sched}
+      <div class="cg-card"><h3>💾 Dati e backup</h3><div class="cg-row"><button class="cg-btn cg-primary" data-set="export">⬇️ Esporta backup (JSON)</button><button class="cg-btn" data-set="import">⬆️ Importa backup</button><input id="st-file" type="file" accept="application/json,.json" style="display:none"></div><div class="cg-row"><button class="cg-btn cg-danger" data-set="wipe-conto">🗑️ Cancella Conto</button><button class="cg-btn cg-danger" data-set="wipe-sched">🗑️ Cancella schedine salvate</button><button class="cg-btn cg-danger" data-set="wipe-all">⚠️ Cancella tutto</button></div><div class="cg-hint">I dati restano solo su questo dispositivo (localStorage). Esporta un backup prima di cambiare telefono o browser.</div></div>
+      <div class="cg-card"><h3>ℹ️ App</h3><div class="cg-hint" style="margin-top:0">${esc((document.getElementById("appVersion") || {}).textContent || "")} · ${esc(((document.getElementById("dataStatusText") || {}).textContent || "").trim().slice(0, 120))}</div><div class="cg-row"><button class="cg-btn" data-set="refresh">🔄 Aggiorna app (svuota cache)</button></div></div>`;
     if (window.cgAppearance) window.cgAppearance.bind($("#cg-imp-body"));
   }
 
@@ -155,69 +221,29 @@
     const t = ev.target.closest("[data-set]");
     if (!t) return;
     const a = t.dataset.set;
-    if (a === "export") {
+    if (a === "save-pin") {
+      const p1 = ($("#sec-pin").value || "").trim();
+      const p2 = ($("#sec-pin2").value || "").trim();
+      if (!p1) { alert("Inserisci una password valida."); return; }
+      if (p1 !== p2) { alert("Le due password non coincidono."); return; }
+      const S = loadSet(); S.contoPin = p1; saveSet(S);
+      contoUnlocked = false;
+      alert("Password salvata! Il Conto ora è protetto.");
+      renderSettings();
+    }
+    else if (a === "del-pin") {
+      const cur = getContoPin();
+      const check = prompt("Inserisci la password attuale per rimuoverla:", "");
+      if (check !== cur) { alert("Password errata."); return; }
+      const S = loadSet(); delete S.contoPin; saveSet(S);
+      contoUnlocked = false;
+      alert("Password rimossa.");
+      renderSettings();
+    }
+    else if (a === "export") {
       const data = {}; KEYS.forEach(k => { try { const v = localStorage.getItem(k); if (v !== null) data[k] = JSON.parse(v); } catch (_) {} });
       download(`combogesss-backup-${new Date().toISOString().slice(0, 10)}.json`, JSON.stringify({ app: "combogesss", version: 1, exportedAt: Date.now(), data }, null, 2));
     }
     else if (a === "import") $("#st-file").click();
     else if (a === "resetdef") { if (window.CGSchedina) window.CGSchedina.resetDefaults(); renderSettings(); }
     else if (a === "wipe-conto") { if (confirm("Cancellare TUTTE le voci del Conto?")) { localStorage.removeItem("combogesss_conto"); alert("Conto cancellato."); } }
-    else if (a === "wipe-sched") { if (confirm("Cancellare tutte le schedine salvate?")) { localStorage.removeItem("combogesss_schedine"); alert("Schedine cancellate."); } }
-    else if (a === "wipe-all") { if (confirm("Cancellare TUTTI i dati (conto, schedine, impostazioni)?")) { KEYS.forEach(k => localStorage.removeItem(k)); location.reload(); } }
-    else if (a === "refresh") {
-      const done = () => location.reload();
-      Promise.resolve()
-        .then(() => (navigator.serviceWorker && navigator.serviceWorker.getRegistrations) ? navigator.serviceWorker.getRegistrations().then(rs => Promise.all(rs.map(r => r.unregister()))) : null)
-        .then(() => window.caches ? caches.keys().then(ks => Promise.all(ks.map(k => caches.delete(k)))) : null)
-        .then(done, done);
-    }
-  }
-
-  function mountHeaderButton() {
-    if (document.getElementById("cgHomeBtn")) return;
-    const rb = document.getElementById("reloadDataBtn") || document.getElementById("checkBtn") || document.querySelector("header button");
-    if (!rb || !rb.parentElement) return;
-    const b = document.createElement("button");
-    b.id = "cgHomeBtn"; b.type = "button"; b.className = rb.className; b.textContent = "🏠 Home";
-    b.style.cssText = "display:inline-flex;align-items:center;gap:4px;cursor:pointer;";
-    b.addEventListener("click", () => nav("home"));
-    rb.parentElement.insertBefore(b, rb.parentElement.firstChild);
-  }
-
-  let lastAutoKey = "";
-  function selectNextUnplayedRound() {
-    if (typeof state === "undefined" || !state.roundsByLeague) return;
-    const code = state.selectedLeagueCode;
-    if (!code) return;
-    const rounds = state.roundsByLeague[code] || [];
-    if (!rounds.length) return;
-    const autoKey = code + "_" + rounds.length;
-    if (autoKey === lastAutoKey) return;
-    const nextRound = rounds.find(r => (r.matches || []).some(m => !m.ftResult));
-    lastAutoKey = autoKey;
-    if (nextRound && state.selectedRound !== nextRound.roundNumber) {
-      state.selectedRound = nextRound.roundNumber;
-      const selEl = document.getElementById("roundSelect") || document.querySelector("select[id*='round' i]");
-      if (selEl) selEl.value = String(nextRound.roundNumber);
-      if (typeof renderMatches === "function") renderMatches();
-    }
-  }
-
-  function init() {
-    build(); mountHeaderButton();
-    const imp = $("#cg-imp-body");
-    imp.addEventListener("change", onSettingsChange);
-    imp.addEventListener("click", onSettingsClick);
-    applyGeneral();
-    window.addEventListener("hashchange", () => { go(location.hash.slice(1)); mountHeaderButton(); });
-    const S = loadSet();
-    let v = location.hash.slice(1);
-    if (!VIEWS.includes(v)) { v = S.startView || "home"; if (v !== "home") history.replaceState(null, "", "#" + v); }
-    go(v);
-    setInterval(() => { if (current === "home") refreshHome(); else if (current === "palinsesto") mountHeaderButton(); }, 1000);
-    setInterval(selectNextUnplayedRound, 350);
-  }
-  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init); else init();
-
-  window.CGHome = { nav, go };
-})();
