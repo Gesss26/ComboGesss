@@ -1,72 +1,223 @@
 from datetime import datetime, timedelta, timezone
-from io import StringIO
 import json
 import os
 import re
-import time
-import cloudscraper
+from urllib.parse import urljoin
 import pandas as pd
+import requests
 
+BASE_URL = "https://football-data.co.uk"
+OPENFOOTBALL_BASE = "https://githubusercontent.com"
+SEASON = "2627"
 OUTPUT_DIR = "data"
 EURO_EXCEL_NAME = "all-euro-data-2026-2027.xlsx"
 
-# Mappa completa: Codice -> (Nazione, Bandiera, Nome Campionato, URL FBref)
+# Codice -> (Nazione, Bandiera, Nome Campionato, File OpenFootball opzionale)
 LEAGUES = {
-    # Italia
-    "I1": ("Italia", "🇮🇹", "Serie A", "https://fbref.com"),
-    "I2": ("Italia", "🇮🇹", "Serie B", "https://fbref.com"),
-    # Inghilterra
-    "E0": ("Inghilterra", "🏴󠁧󠁢󠁥󠁮󠁧󠁿", "Premier League", "https://fbref.com"),
-    "E1": ("Inghilterra", "🏴󠁧󠁢󠁥󠁮󠁧󠁿", "Championship", "https://fbref.com"),
-    "E2": ("Inghilterra", "🏴󠁧󠁢󠁥󠁮󠁧󠁿", "League One", "https://fbref.com"),
-    "E3": ("Inghilterra", "🏴󠁧󠁢󠁥󠁮󠁧󠁿", "League Two", "https://fbref.com"),
-    "EC": ("Inghilterra", "🏴󠁧󠁢󠁥󠁮󠁧󠁿", "National League", "https://fbref.com"),
-    # Scozia
-    "SC0": ("Scozia", "🏴󠁧󠁢󠁳󠁣󠁴󠁿", "Premiership", "https://fbref.com"),
-    "SC1": ("Scozia", "🏴󠁧󠁢󠁳󠁣󠁴󠁿", "Championship", "https://fbref.com"),
-    # Spagna
-    "SP1": ("Spagna", "🇪🇸", "La Liga", "https://fbref.com"),
-    "SP2": ("Spagna", "🇪🇸", "Segunda Division", "https://fbref.com"),
-    # Germania
-    "D1": ("Germania", "🇩🇪", "Bundesliga", "https://fbref.com"),
-    "D2": ("Germania", "🇩🇪", "2. Bundesliga", "https://fbref.com"),
-    # Francia
-    "F1": ("Francia", "🇫🇷", "Ligue 1", "https://fbref.com"),
-    "F2": ("Francia", "🇫🇷", "Ligue 2", "https://fbref.com"),
-    # Paesi Bassi
-    "N1": ("Paesi Bassi", "🇳🇱", "Eredivisie", "https://fbref.com"),
-    # Belgio
-    "B1": ("Belgio", "🇧🇪", "Pro League", "https://fbref.com"),
-    # Portogallo
-    "P1": ("Portogallo", "🇵🇹", "Liga Portugal", "https://fbref.com"),
-    # Turchia
-    "T1": ("Turchia", "🇹🇷", "Super Lig", "https://fbref.com"),
-    # Grecia
-    "G1": ("Grecia", "🇬🇷", "Super League", "https://fbref.com"),
+    "I1": ("Italia", "🇮🇹", "Serie A", "it.1.json"),
+    "I2": ("Italia", "🇮🇹", "Serie B", "it.2.json"),
+    "E0": ("Inghilterra", "🏴󠁧󠁢󠁥󠁮󠁧󠁿", "Premier League", "en.1.json"),
+    "E1": ("Inghilterra", "🏴󠁧󠁢󠁥󠁮󠁧󠁿", "Championship", "en.2.json"),
+    "E2": ("Inghilterra", "🏴󠁧󠁢󠁥󠁮󠁧󠁿", "League One", "en.3.json"),
+    "E3": ("Inghilterra", "🏴󠁧󠁢󠁥󠁮󠁧󠁿", "League Two", "en.4.json"),
+    "EC": ("Inghilterra", "🏴󠁧󠁢󠁥󠁮󠁧󠁿", "National League", None),
+    "SC0": ("Scozia", "🏴󠁧󠁢󠁳󠁣󠁴󠁿", "Premiership", "sco.1.json"),
+    "SC1": ("Scozia", "🏴󠁧󠁢󠁳󠁣󠁴󠁿", "Championship", None),
+    "SC2": ("Scozia", "🏴󠁧󠁢󠁳󠁣󠁴󠁿", "League One", None),
+    "SC3": ("Scozia", "🏴󠁧󠁢󠁳󠁣󠁴󠁿", "League Two", None),
+    "SP1": ("Spagna", "🇪🇸", "La Liga", "es.1.json"),
+    "SP2": ("Spagna", "🇪🇸", "Segunda Division", "es.2.json"),
+    "D1": ("Germania", "🇩🇪", "Bundesliga", "de.1.json"),
+    "D2": ("Germania", "🇩🇪", "2. Bundesliga", "de.2.json"),
+    "F1": ("Francia", "🇫🇷", "Ligue 1", "fr.1.json"),
+    "F2": ("Francia", "🇫🇷", "Ligue 2", "fr.2.json"),
+    "N1": ("Paesi Bassi", "🇳🇱", "Eredivisie", "nl.1.json"),
+    "B1": ("Belgio", "🇧🇪", "Pro League", "be.1.json"),
+    "P1": ("Portogallo", "🇵🇹", "Liga Portugal", "pt.1.json"),
+    "T1": ("Turchia", "🇹🇷", "Super Lig", "tr.1.json"),
+    "G1": ("Grecia", "🇬🇷", "Super League", "gr.1.json"),
 }
+
+# Normalizzazione nomi squadra: OpenFootball -> Football-Data.co.uk
+TEAM_MAP = {
+    # Italia
+    "FC Internazionale Milano": "Inter",
+    "Internazionale": "Inter",
+    "AC Milan": "Milan",
+    "AS Roma": "Roma",
+    "SS Lazio": "Lazio",
+    "SSC Napoli": "Napoli",
+    "Juventus FC": "Juventus",
+    "Atalanta BC": "Atalanta",
+    "ACF Fiorentina": "Fiorentina",
+    "Bologna FC 1909": "Bologna",
+    "Torino FC": "Torino",
+    "Udinese Calcio": "Udinese",
+    "Genoa CFC": "Genoa",
+    "Cagliari Calcio": "Cagliari",
+    "Hellas Verona FC": "Verona",
+    "Hellas Verona": "Verona",
+    "US Lecce": "Lecce",
+    "Parma Calcio 1913": "Parma",
+    "Como 1907": "Como",
+    "AC Monza": "Monza",
+    "Venezia FC": "Venezia",
+    "Empoli FC": "Empoli",
+    "US Sassuolo Calcio": "Sassuolo",
+    "Frosinone Calcio": "Frosinone",
+    # Inghilterra
+    "Manchester United FC": "Man United",
+    "Manchester United": "Man United",
+    "Manchester City FC": "Man City",
+    "Manchester City": "Man City",
+    "Newcastle United FC": "Newcastle",
+    "Newcastle United": "Newcastle",
+    "Nottingham Forest FC": "Nott'm Forest",
+    "Nottingham Forest": "Nott'm Forest",
+    "Wolverhampton Wanderers FC": "Wolves",
+    "Wolverhampton Wanderers": "Wolves",
+    "West Ham United FC": "West Ham",
+    "West Ham United": "West Ham",
+    "Tottenham Hotspur FC": "Tottenham",
+    "Tottenham Hotspur": "Tottenham",
+    "Brighton & Hove Albion FC": "Brighton",
+    "Brighton & Hove Albion": "Brighton",
+    "Leicester City FC": "Leicester",
+    "Ipswich Town FC": "Ipswich",
+    "Arsenal FC": "Arsenal",
+    "Chelsea FC": "Chelsea",
+    "Liverpool FC": "Liverpool",
+    "Everton FC": "Everton",
+    "Fulham FC": "Fulham",
+    "Brentford FC": "Brentford",
+    "Crystal Palace FC": "Crystal Palace",
+    "AFC Bournemouth": "Bournemouth",
+    "Aston Villa FC": "Aston Villa",
+    "Southampton FC": "Southampton",
+    # Spagna
+    "FC Barcelona": "Barcelona",
+    "Real Madrid CF": "Real Madrid",
+    "Club Atlético de Madrid": "Ath Madrid",
+    "Atlético Madrid": "Ath Madrid",
+    "Athletic Club": "Ath Bilbao",
+    "Real Sociedad de Fútbol": "Sociedad",
+    "Real Betis Balompié": "Betis",
+    "Villarreal CF": "Villarreal",
+    "Sevilla FC": "Sevilla",
+    "Valencia CF": "Valencia",
+    "RC Celta de Vigo": "Celta",
+    "Celta Vigo": "Celta",
+    "CA Osasuna": "Osasuna",
+    "Getafe CF": "Getafe",
+    "Rayo Vallecano de Madrid": "Vallecano",
+    "Rayo Vallecano": "Vallecano",
+    "RCD Mallorca": "Mallorca",
+    "Deportivo Alavés": "Alaves",
+    "UD Las Palmas": "Las Palmas",
+    "Girona FC": "Girona",
+    "RCD Espanyol de Barcelona": "Espanol",
+    "RCD Espanyol": "Espanol",
+    "Real Valladolid CF": "Valladolid",
+    "CD Leganés": "Leganes",
+    # Germania
+    "FC Bayern München": "Bayern Munich",
+    "Bayern München": "Bayern Munich",
+    "Borussia Dortmund": "Dortmund",
+    "Bayer 04 Leverkusen": "Leverkusen",
+    "RB Leipzig": "RB Leipzig",
+    "Eintracht Frankfurt": "Ein Frankfurt",
+    "VfB Stuttgart": "Stuttgart",
+    "Borussia Mönchengladbach": "M'gladbach",
+    "VfL Wolfsburg": "Wolfsburg",
+    "SC Freiburg": "Freiburg",
+    "TSG 1899 Hoffenheim": "Hoffenheim",
+    "1. FSV Mainz 05": "Mainz",
+    "FC Augsburg": "Augsburg",
+    "SV Werder Bremen": "Werder Bremen",
+    "1. FC Union Berlin": "Union Berlin",
+    "VfL Bochum 1848": "Bochum",
+    "1. FC Heidenheim 1846": "Heidenheim",
+    "FC St. Pauli 1910": "St Pauli",
+    "Holstein Kiel": "Holstein Kiel",
+    # Francia
+    "Paris Saint-Germain FC": "Paris SG",
+    "Paris Saint-Germain": "Paris SG",
+    "Olympique de Marseille": "Marseille",
+    "AS Monaco FC": "Monaco",
+    "AS Monaco": "Monaco",
+    "Olympique Lyonnais": "Lyon",
+    "LOSC Lille": "Lille",
+    "OGC Nice": "Nice",
+    "RC Lens": "Lens",
+    "Stade Rennais FC 1901": "Rennes",
+    "Stade Brestois 29": "Brest",
+    "RC Strasbourg Alsace": "Strasbourg",
+    "FC Nantes": "Nantes",
+    "Toulouse FC": "Toulouse",
+    "Montpellier HSC": "Montpellier",
+    "Stade de Reims": "Reims",
+    "AJ Auxerre": "Auxerre",
+    "Angers SCO": "Angers",
+    "AS Saint-Étienne": "St Etienne",
+    "Le Havre AC": "Le Havre",
+}
+
+HEADERS = {"User-Agent": "Mozilla/5.0 (compatible; ComboGesssUpdater/2.0)"}
 
 
 def ensure_dir(path: str) -> None:
     os.makedirs(path, exist_ok=True)
 
 
+def clean_team_name(raw_name: str, known_teams: set[str]) -> str:
+    name = str(raw_name or "").strip()
+    if name in TEAM_MAP:
+        return TEAM_MAP[name]
+    if name in known_teams:
+        return name
+    # Rimuove suffissi comuni (FC, CF, AC, AS, 1909, ecc.) per trovare corrispondenze
+    stripped = re.sub(r"\b(FC|CF|AC|AS|SC|SV|VfL|VfB|US|SS|SSC|ACF|UD|CD|RC|RCD|CA|OGC|LOSC|AJ|1\.)\b", "", name).strip()
+    stripped = re.sub(r"\b\d{4}\b", "", stripped).strip()
+    stripped = re.sub(r"\s+", " ", stripped)
+    if stripped in TEAM_MAP:
+        return TEAM_MAP[stripped]
+    for kt in known_teams:
+        if kt.lower() == stripped.lower() or kt.lower() in stripped.lower() or stripped.lower() in kt.lower():
+            return kt
+    return stripped or name
+
+
 def normalize_date_dd_mm_yyyy(val) -> str:
     if val is None or (isinstance(val, float) and pd.isna(val)):
         return ""
+    if isinstance(val, (pd.Timestamp, datetime)):
+        return val.strftime("%d/%m/%Y")
+    if isinstance(val, (int, float)):
+        dt = datetime(1899, 12, 30, tzinfo=timezone.utc) + timedelta(days=int(float(val)))
+        return dt.strftime("%d/%m/%Y")
     s = str(val).strip()
-    if not s or s.lower() in {"nan", "nat", "none", "date"}:
+    if not s or s.lower() in {"nan", "nat", "none"}:
         return ""
     date_part = re.split(r"[\sT]+", s)[0]
-    m_ymd = re.fullmatch(r"(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})", date_part)
-    if m_ymd:
-        return f"{int(m_ymd.group(3)):02d}/{int(m_ymd.group(2)):02d}/{int(m_ymd.group(1)):04d}"
     m_dmy = re.fullmatch(r"(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})", date_part)
     if m_dmy:
         y = int(m_dmy.group(3))
         if y < 100:
-            y += 2000
+            y += 1900 if y >= 70 else 2000
         return f"{int(m_dmy.group(1)):02d}/{int(m_dmy.group(2)):02d}/{y:04d}"
+    m_ymd = re.fullmatch(r"(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})", date_part)
+    if m_ymd:
+        return f"{int(m_ymd.group(3)):02d}/{int(m_ymd.group(2)):02d}/{int(m_ymd.group(1)):04d}"
     return s
+
+
+def normalize_df_dates(df: pd.DataFrame) -> pd.DataFrame:
+    if df is None or df.empty:
+        return df
+    for col in df.columns:
+        if str(col).strip().lower() in {"date", "matchdate", "data"}:
+            df[col] = df[col].apply(normalize_date_dd_mm_yyyy)
+    return df
 
 
 def export_countries_catalog(out_dir: str) -> None:
@@ -81,136 +232,32 @@ def export_countries_catalog(out_dir: str) -> None:
     print(f"[OK] Creato catalogo nazioni/campionati: {out_path}")
 
 
-def parse_fbref_league(scraper, code: str, country: str, flag: str, league_name: str, url: str):
-    """Scarica la pagina FBref di un campionato e restituisce (df_giocate, df_future)."""
+def download_file(url: str, dest_path: str) -> bool:
     try:
-        resp = scraper.get(url, timeout=30)
-        if resp.status_code == 429:
-            print(f"[RATE LIMIT] Attesa extra di 15s su {code}...")
-            time.sleep(15)
-            resp = scraper.get(url, timeout=30)
+        resp = requests.get(url, headers=HEADERS, timeout=30)
         resp.raise_for_status()
-
-        tables = pd.read_html(StringIO(resp.text))
-        df = None
-        for t in tables:
-            if "Home" in t.columns and "Away" in t.columns and "Score" in t.columns:
-                df = t.copy()
-                break
-
-        if df is None or df.empty:
-            print(f"[AVVISO] Nessuna tabella calendario trovata per {code}")
-            return pd.DataFrame(), pd.DataFrame()
-
-        # Pulizia righe intestazione ripetute e righe vuote
-        df = df[df["Date"].notna()]
-        df = df[df["Date"].astype(str).str.strip() != "Date"]
-        df = df[df["Home"].notna() & df["Away"].notna()]
-
-        # Gestione colonne xG (alcune serie minori non hanno la colonna xG su FBref)
-        xg_cols = [c for c in df.columns if str(c).startswith("xG")]
-        has_xg = len(xg_cols) >= 2
-
-        rows_all = []
-        rows_future = []
-
-        for _, r in df.iterrows():
-            date_str = normalize_date_dd_mm_yyyy(r.get("Date", ""))
-            if not date_str:
-                continue
-
-            raw_time = str(r.get("Time", "")).strip()
-            time_str = raw_time[:5] if re.match(r"^\d{1,2}:\d{2}", raw_time) else "15:00"
-            home = str(r["Home"]).strip()
-            away = str(r["Away"]).strip()
-            score = str(r.get("Score", "")).strip()
-
-            home_xg = pd.to_numeric(r[xg_cols[0]], errors="coerce") if has_xg else None
-            away_xg = pd.to_numeric(r[xg_cols[1]], errors="coerce") if has_xg else None
-
-            # Controlla se la partita ha un risultato valido (es. "2–1" o "2-1")
-            m_score = re.match(r"^(\d+)\s*[–\-]\s*(\d+)$", score)
-            if m_score:
-                hg = int(m_score.group(1))
-                ag = int(m_score.group(2))
-                ftr = "H" if hg > ag else ("A" if hg < ag else "D")
-            else:
-                hg, ag, ftr = None, None, ""
-
-            base_row = {
-                "Div": code,
-                "DivCode": code,
-                "Country": country,
-                "Flag": flag,
-                "LeagueName": league_name,
-                "Date": date_str,
-                "Time": time_str,
-                "HomeTeam": home,
-                "AwayTeam": away,
-                "FTHG": hg if hg is not None else "",
-                "FTAG": ag if ag is not None else "",
-                "FTR": ftr,
-                "HomeXG": round(float(home_xg), 2) if pd.notna(home_xg) else "",
-                "AwayXG": round(float(away_xg), 2) if pd.notna(away_xg) else "",
-            }
-            rows_all.append(base_row)
-
-            if hg is None:
-                rows_future.append(base_row)
-
-        df_all = pd.DataFrame(rows_all)
-        df_fut = pd.DataFrame(rows_future)
-        print(f"[OK] {code} ({league_name}): {len(df_all) - len(df_fut)} giocate, {len(df_fut)} future")
-        return df_all, df_fut
-
+        with open(dest_path, "wb") as f:
+            f.write(resp.content)
+        print(f"[OK] Scaricato: {url}")
+        return True
     except Exception as exc:
-        print(f"[ERRORE] Impossibile elaborare {code} ({url}): {exc}")
-        return pd.DataFrame(), pd.DataFrame()
+        print(f"[AVVISO] Impossibile scaricare {url}: {exc}")
+        return False
 
 
-def main() -> None:
-    ensure_dir(OUTPUT_DIR)
-    print("=== Aggiornamento dati ComboGesss da FBref ===")
-    export_countries_catalog(OUTPUT_DIR)
-
-    scraper = cloudscraper.create_scraper()
-    all_frames = []
-    future_frames = []
-    excel_sheets = {}
-
-    for code, (country, flag, league_name, url) in LEAGUES.items():
-        df_all, df_fut = parse_fbref_league(scraper, code, country, flag, league_name, url)
-        if not df_all.empty:
-            csv_path = os.path.join(OUTPUT_DIR, f"{code}.csv")
-            df_all.to_csv(csv_path, index=False, encoding="utf-8")
-            all_frames.append(df_all)
-            excel_sheets[code] = df_all
-        if not df_fut.empty:
-            future_frames.append(df_fut)
-
-        # Pausa anti-ban obbligatoria tra un campionato e l'altro
-        time.sleep(5)
-
-    if all_frames:
-        combined_df = pd.concat(all_frames, ignore_index=True)
-        combined_csv = os.path.join(OUTPUT_DIR, "all_leagues.csv")
-        combined_df.to_csv(combined_csv, index=False, encoding="utf-8")
-        print(f"[OK] Creato archivio unificato: {combined_csv} ({len(combined_df)} righe)")
-
-        euro_excel_path = os.path.join(OUTPUT_DIR, EURO_EXCEL_NAME)
-        with pd.ExcelWriter(euro_excel_path, engine="openpyxl") as writer:
-            for sheet_code, sheet_df in excel_sheets.items():
-                sheet_df.to_excel(writer, sheet_name=sheet_code, index=False)
-        print(f"[OK] Creato Excel campionati: {euro_excel_path}")
-
-    if future_frames:
-        fixtures_df = pd.concat(future_frames, ignore_index=True)
-        fixtures_path = os.path.join(OUTPUT_DIR, "fixtures.xlsx")
-        fixtures_df.to_excel(fixtures_path, index=False, engine="openpyxl")
-        print(f"[OK] Creato file partite future: {fixtures_path} ({len(fixtures_df)} partite)")
-
-    print("=== Completato ===")
+def sync_euro_excel(out_dir: str) -> None:
+    local_excel = os.path.join(out_dir, EURO_EXCEL_NAME)
+    candidate_url = urljoin(BASE_URL, f"mmz4281/{SEASON}/{EURO_EXCEL_NAME}")
+    download_file(candidate_url, local_excel)
+    if os.path.exists(local_excel):
+        try:
+            xl = pd.ExcelFile(local_excel)
+            frames = {sheet: normalize_df_dates(xl.parse(sheet)) for sheet in xl.sheet_names}
+            with pd.ExcelWriter(local_excel, engine="openpyxl") as writer:
+                for sheet, df in frames.items():
+                    df.to_excel(writer, sheet_name=sheet, index=False)
+            print(f"[OK] Normalizzato {local_excel}")
+        except Exception as exc:
+            print(f"[AVVISO] Normalizzazione {local_excel}: {exc}")
 
 
-if __name__ == "__main__":
-    main()
