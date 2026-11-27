@@ -1,55 +1,48 @@
 from datetime import datetime, timedelta, timezone
+from io import StringIO
 import json
 import os
 import re
-from urllib.parse import urljoin
-import requests
+import time
+import cloudscraper
 import pandas as pd
 
-BASE_URL = "https://www.football-data.co.uk/"
-SEASON = "2627"  # Stagione 2026/2027
 OUTPUT_DIR = "data"
 EURO_EXCEL_NAME = "all-euro-data-2026-2027.xlsx"
 
-# Mappa completa: Codice -> (Nazione, Bandiera, Nome Campionato)
+# Mappa completa: Codice -> (Nazione, Bandiera, Nome Campionato, URL FBref)
 LEAGUES = {
     # Italia
-    "I1": ("Italia", "🇮🇹", "Serie A"),
-    "I2": ("Italia", "🇮🇹", "Serie B"),
+    "I1": ("Italia", "🇮🇹", "Serie A", "https://fbref.com"),
+    "I2": ("Italia", "🇮🇹", "Serie B", "https://fbref.com"),
     # Inghilterra
-    "E0": ("Inghilterra", "🏴󠁧󠁢󠁥󠁮󠁧󠁿", "Premier League"),
-    "E1": ("Inghilterra", "🏴󠁧󠁢󠁥󠁮󠁧󠁿", "Championship"),
-    "E2": ("Inghilterra", "🏴󠁧󠁢󠁥󠁮󠁧󠁿", "League One"),
-    "E3": ("Inghilterra", "🏴󠁧󠁢󠁥󠁮󠁧󠁿", "League Two"),
-    "EC": ("Inghilterra", "🏴󠁧󠁢󠁥󠁮󠁧󠁿", "National League"),
+    "E0": ("Inghilterra", "🏴󠁧󠁢󠁥󠁮󠁧󠁿", "Premier League", "https://fbref.com"),
+    "E1": ("Inghilterra", "🏴󠁧󠁢󠁥󠁮󠁧󠁿", "Championship", "https://fbref.com"),
+    "E2": ("Inghilterra", "🏴󠁧󠁢󠁥󠁮󠁧󠁿", "League One", "https://fbref.com"),
+    "E3": ("Inghilterra", "🏴󠁧󠁢󠁥󠁮󠁧󠁿", "League Two", "https://fbref.com"),
+    "EC": ("Inghilterra", "🏴󠁧󠁢󠁥󠁮󠁧󠁿", "National League", "https://fbref.com"),
     # Scozia
-    "SC0": ("Scozia", "🏴󠁧󠁢󠁳󠁣󠁴󠁿", "Premiership"),
-    "SC1": ("Scozia", "🏴󠁧󠁢󠁳󠁣󠁴󠁿", "Championship"),
-    "SC2": ("Scozia", "🏴󠁧󠁢󠁳󠁣󠁴󠁿", "League One"),
-    "SC3": ("Scozia", "🏴󠁧󠁢󠁳󠁣󠁴󠁿", "League Two"),
+    "SC0": ("Scozia", "🏴󠁧󠁢󠁳󠁣󠁴󠁿", "Premiership", "https://fbref.com"),
+    "SC1": ("Scozia", "🏴󠁧󠁢󠁳󠁣󠁴󠁿", "Championship", "https://fbref.com"),
     # Spagna
-    "SP1": ("Spagna", "🇪🇸", "La Liga"),
-    "SP2": ("Spagna", "🇪🇸", "Segunda Division"),
+    "SP1": ("Spagna", "🇪🇸", "La Liga", "https://fbref.com"),
+    "SP2": ("Spagna", "🇪🇸", "Segunda Division", "https://fbref.com"),
     # Germania
-    "D1": ("Germania", "🇩🇪", "Bundesliga"),
-    "D2": ("Germania", "🇩🇪", "2. Bundesliga"),
+    "D1": ("Germania", "🇩🇪", "Bundesliga", "https://fbref.com"),
+    "D2": ("Germania", "🇩🇪", "2. Bundesliga", "https://fbref.com"),
     # Francia
-    "F1": ("Francia", "🇫🇷", "Ligue 1"),
-    "F2": ("Francia", "🇫🇷", "Ligue 2"),
+    "F1": ("Francia", "🇫🇷", "Ligue 1", "https://fbref.com"),
+    "F2": ("Francia", "🇫🇷", "Ligue 2", "https://fbref.com"),
     # Paesi Bassi
-    "N1": ("Paesi Bassi", "🇳🇱", "Eredivisie"),
+    "N1": ("Paesi Bassi", "🇳🇱", "Eredivisie", "https://fbref.com"),
     # Belgio
-    "B1": ("Belgio", "🇧🇪", "Pro League"),
+    "B1": ("Belgio", "🇧🇪", "Pro League", "https://fbref.com"),
     # Portogallo
-    "P1": ("Portogallo", "🇵🇹", "Liga Portugal"),
+    "P1": ("Portogallo", "🇵🇹", "Liga Portugal", "https://fbref.com"),
     # Turchia
-    "T1": ("Turchia", "🇹🇷", "Super Lig"),
+    "T1": ("Turchia", "🇹🇷", "Super Lig", "https://fbref.com"),
     # Grecia
-    "G1": ("Grecia", "🇬🇷", "Super League"),
-}
-
-HEADERS = {
-    "User-Agent": "Mozilla/5.0 (compatible; ComboGesssUpdater/1.0)"
+    "G1": ("Grecia", "🇬🇷", "Super League", "https://fbref.com"),
 }
 
 
@@ -58,207 +51,164 @@ def ensure_dir(path: str) -> None:
 
 
 def normalize_date_dd_mm_yyyy(val) -> str:
-    """Converte qualsiasi data (DD/MM/YYYY, DD/MM/YY, YYYY-MM-DD, seriale Excel, Date) in DD/MM/AAAA."""
     if val is None or (isinstance(val, float) and pd.isna(val)):
         return ""
-
-    if isinstance(val, pd.Timestamp):
-        if pd.isna(val):
-            return ""
-        return val.strftime("%d/%m/%Y")
-
-    if isinstance(val, datetime):
-        return val.strftime("%d/%m/%Y")
-
-    if isinstance(val, (int, float)):
-        try:
-            serial_days = int(float(val))
-            dt = datetime(1899, 12, 30, tzinfo=timezone.utc) + timedelta(days=serial_days)
-            return dt.strftime("%d/%m/%Y")
-        except Exception:
-            return str(val).strip()
-
     s = str(val).strip()
-    if not s or s.lower() in {"nan", "nat", "none"}:
+    if not s or s.lower() in {"nan", "nat", "none", "date"}:
         return ""
-
-    if re.fullmatch(r"\d+(\.\d+)?", s):
-        return normalize_date_dd_mm_yyyy(float(s))
-
     date_part = re.split(r"[\sT]+", s)[0]
-
-    # DD/MM/AAAA oppure DD/MM/AA (con / o -)
-    m_dmy = re.fullmatch(r"(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})", date_part)
-    if m_dmy:
-        day = int(m_dmy.group(1))
-        month = int(m_dmy.group(2))
-        year = int(m_dmy.group(3))
-        if year < 100:
-            year += 1900 if year >= 70 else 2000
-        try:
-            dt = datetime(year, month, day)
-            return dt.strftime("%d/%m/%Y")
-        except ValueError:
-            return f"{day:02d}/{month:02d}/{year:04d}"
-
-    # AAAA-MM-GG oppure AAAA/MM/GG
     m_ymd = re.fullmatch(r"(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})", date_part)
     if m_ymd:
-        year = int(m_ymd.group(1))
-        month = int(m_ymd.group(2))
-        day = int(m_ymd.group(3))
-        try:
-            dt = datetime(year, month, day)
-            return dt.strftime("%d/%m/%Y")
-        except ValueError:
-            return f"{day:02d}/{month:02d}/{year:04d}"
-
+        return f"{int(m_ymd.group(3)):02d}/{int(m_ymd.group(2)):02d}/{int(m_ymd.group(1)):04d}"
+    m_dmy = re.fullmatch(r"(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})", date_part)
+    if m_dmy:
+        y = int(m_dmy.group(3))
+        if y < 100:
+            y += 2000
+        return f"{int(m_dmy.group(1)):02d}/{int(m_dmy.group(2)):02d}/{y:04d}"
     return s
 
 
-def normalize_df_dates(df: pd.DataFrame) -> pd.DataFrame:
-    """Normalizza tutte le colonne data di un DataFrame nel formato DD/MM/AAAA."""
-    if df is None or df.empty:
-        return df
-    for col in df.columns:
-        if str(col).strip().lower() in {"date", "matchdate", "data"}:
-            df[col] = df[col].apply(normalize_date_dd_mm_yyyy)
-    return df
-
-
-def build_countries_catalog() -> list[dict]:
-    """Raggruppa i campionati per nazione includendo bandiera e codici."""
-    grouped: dict[str, dict] = {}
-    for code, (country, flag, league_name) in LEAGUES.items():
+def export_countries_catalog(out_dir: str) -> None:
+    grouped = {}
+    for code, (country, flag, league_name, _) in LEAGUES.items():
         if country not in grouped:
-            grouped[country] = {
-                "country": country,
-                "flag": flag,
-                "leagues": [],
-            }
-        grouped[country]["leagues"].append({
-            "code": code,
-            "name": league_name,
-        })
-    return list(grouped.values())
-
-
-def export_countries_catalog(out_dir: str) -> list[dict]:
-    """Salva data/countries_leagues.json nella cartella data."""
-    catalog = build_countries_catalog()
+            grouped[country] = {"country": country, "flag": flag, "leagues": []}
+        grouped[country]["leagues"].append({"code": code, "name": league_name})
     out_path = os.path.join(out_dir, "countries_leagues.json")
     with open(out_path, "w", encoding="utf-8") as f:
-        json.dump(catalog, f, ensure_ascii=False, indent=2)
+        json.dump(list(grouped.values()), f, ensure_ascii=False, indent=2)
     print(f"[OK] Creato catalogo nazioni/campionati: {out_path}")
-    return catalog
 
 
-def download_file(url: str, dest_path: str) -> bool:
+def parse_fbref_league(scraper, code: str, country: str, flag: str, league_name: str, url: str):
+    """Scarica la pagina FBref di un campionato e restituisce (df_giocate, df_future)."""
     try:
-        resp = requests.get(url, headers=HEADERS, timeout=30)
+        resp = scraper.get(url, timeout=30)
+        if resp.status_code == 429:
+            print(f"[RATE LIMIT] Attesa extra di 15s su {code}...")
+            time.sleep(15)
+            resp = scraper.get(url, timeout=30)
         resp.raise_for_status()
-        with open(dest_path, "wb") as f:
-            f.write(resp.content)
-        print(f"[OK] Scaricato: {url} -> {dest_path}")
-        return True
+
+        tables = pd.read_html(StringIO(resp.text))
+        df = None
+        for t in tables:
+            if "Home" in t.columns and "Away" in t.columns and "Score" in t.columns:
+                df = t.copy()
+                break
+
+        if df is None or df.empty:
+            print(f"[AVVISO] Nessuna tabella calendario trovata per {code}")
+            return pd.DataFrame(), pd.DataFrame()
+
+        # Pulizia righe intestazione ripetute e righe vuote
+        df = df[df["Date"].notna()]
+        df = df[df["Date"].astype(str).str.strip() != "Date"]
+        df = df[df["Home"].notna() & df["Away"].notna()]
+
+        # Gestione colonne xG (alcune serie minori non hanno la colonna xG su FBref)
+        xg_cols = [c for c in df.columns if str(c).startswith("xG")]
+        has_xg = len(xg_cols) >= 2
+
+        rows_all = []
+        rows_future = []
+
+        for _, r in df.iterrows():
+            date_str = normalize_date_dd_mm_yyyy(r.get("Date", ""))
+            if not date_str:
+                continue
+
+            raw_time = str(r.get("Time", "")).strip()
+            time_str = raw_time[:5] if re.match(r"^\d{1,2}:\d{2}", raw_time) else "15:00"
+            home = str(r["Home"]).strip()
+            away = str(r["Away"]).strip()
+            score = str(r.get("Score", "")).strip()
+
+            home_xg = pd.to_numeric(r[xg_cols[0]], errors="coerce") if has_xg else None
+            away_xg = pd.to_numeric(r[xg_cols[1]], errors="coerce") if has_xg else None
+
+            # Controlla se la partita ha un risultato valido (es. "2–1" o "2-1")
+            m_score = re.match(r"^(\d+)\s*[–\-]\s*(\d+)$", score)
+            if m_score:
+                hg = int(m_score.group(1))
+                ag = int(m_score.group(2))
+                ftr = "H" if hg > ag else ("A" if hg < ag else "D")
+            else:
+                hg, ag, ftr = None, None, ""
+
+            base_row = {
+                "Div": code,
+                "DivCode": code,
+                "Country": country,
+                "Flag": flag,
+                "LeagueName": league_name,
+                "Date": date_str,
+                "Time": time_str,
+                "HomeTeam": home,
+                "AwayTeam": away,
+                "FTHG": hg if hg is not None else "",
+                "FTAG": ag if ag is not None else "",
+                "FTR": ftr,
+                "HomeXG": round(float(home_xg), 2) if pd.notna(home_xg) else "",
+                "AwayXG": round(float(away_xg), 2) if pd.notna(away_xg) else "",
+            }
+            rows_all.append(base_row)
+
+            if hg is None:
+                rows_future.append(base_row)
+
+        df_all = pd.DataFrame(rows_all)
+        df_fut = pd.DataFrame(rows_future)
+        print(f"[OK] {code} ({league_name}): {len(df_all) - len(df_fut)} giocate, {len(df_fut)} future")
+        return df_all, df_fut
+
     except Exception as exc:
-        print(f"[AVVISO] Impossibile scaricare {url}: {exc}")
-        return False
-
-
-def normalize_excel_file_in_place(excel_path: str) -> None:
-    """Riscrive tutti i fogli del file Excel normalizzando le date in DD/MM/AAAA."""
-    if not os.path.exists(excel_path):
-        return
-    try:
-        xl = pd.ExcelFile(excel_path)
-        frames = {}
-        for sheet in xl.sheet_names:
-            df = xl.parse(sheet)
-            frames[sheet] = normalize_df_dates(df)
-        with pd.ExcelWriter(excel_path, engine="openpyxl") as writer:
-            for sheet, df in frames.items():
-                df.to_excel(writer, sheet_name=sheet, index=False)
-        print(f"[OK] Date normalizzate in DD/MM/AAAA per tutti i fogli di {excel_path}")
-    except Exception as exc:
-        print(f"[AVVISO] Normalizzazione Excel {excel_path}: {exc}")
-
-
-def download_fixtures_excel(dest_path: str) -> None:
-    """Scarica il file Excel delle partite future da matches.php / fixtures.xlsx."""
-    direct_fixtures_url = urljoin(BASE_URL, "fixtures.xlsx")
-    if not download_file(direct_fixtures_url, dest_path):
-        try:
-            matches_page = urljoin(BASE_URL, "matches.php")
-            resp = requests.get(matches_page, headers=HEADERS, timeout=30)
-            resp.raise_for_status()
-            links = re.findall(r'href=["\']([^"\']*\.(?:xlsx|xls|csv))["\']', resp.text, re.I)
-            for href in links:
-                if "fix" in href.lower() or "match" in href.lower():
-                    target_url = urljoin(matches_page, href)
-                    if download_file(target_url, dest_path):
-                        break
-        except Exception as exc:
-            print(f"[AVVISO] Fallback matches.php non riuscito: {exc}")
-
-    normalize_excel_file_in_place(dest_path)
-
-
-def sync_euro_excel(out_dir: str) -> None:
-    """Scarica (ogni volta) all-euro-data-2026-2027.xlsx dentro data/ e normalizza le date."""
-    local_excel = os.path.join(out_dir, EURO_EXCEL_NAME)
-    # Riscarica sempre il file (così ogni esecuzione giornaliera lo aggiorna);
-    # se il download fallisce, resta la copia precedente.
-    candidate_url = urljoin(BASE_URL, f"mmz4281/{SEASON}/{EURO_EXCEL_NAME}")
-    download_file(candidate_url, local_excel)
-
-    if os.path.exists(local_excel):
-        try:
-            xl = pd.ExcelFile(local_excel)
-            print(f"[INFO] Fogli trovati in {local_excel}: {xl.sheet_names}")
-            for sheet in xl.sheet_names:
-                code = sheet.strip().upper()
-                if code not in LEAGUES:
-                    print(f"[AVVISO] Foglio/codice non mappato in LEAGUES: '{sheet}'")
-            normalize_excel_file_in_place(local_excel)
-        except Exception as exc:
-            print(f"[AVVISO] Impossibile leggere {local_excel}: {exc}")
-
-
-def download_leagues_data(season: str, out_dir: str) -> None:
-    """Scarica i CSV di tutti i campionati configurati, normalizza le date in DD/MM/AAAA e crea data/all_leagues.csv."""
-    all_frames = []
-    for code, (country, flag, league_name) in LEAGUES.items():
-        url = f"{BASE_URL}mmz4281/{season}/{code}.csv"
-        csv_path = os.path.join(out_dir, f"{code}.csv")
-        if download_file(url, csv_path):
-            try:
-                df = pd.read_csv(csv_path, encoding="utf-8-sig", on_bad_lines="skip")
-                df = normalize_df_dates(df)
-                df["Country"] = country
-                df["Flag"] = flag
-                df["LeagueName"] = league_name
-                df["DivCode"] = code
-                df.to_csv(csv_path, index=False, encoding="utf-8")
-                all_frames.append(df)
-            except Exception as exc:
-                print(f"[AVVISO] Lettura CSV {code} parziale: {exc}")
-
-    if all_frames:
-        combined_df = pd.concat(all_frames, ignore_index=True)
-        combined_df = normalize_df_dates(combined_df)
-        combined_csv = os.path.join(out_dir, "all_leagues.csv")
-        combined_df.to_csv(combined_csv, index=False, encoding="utf-8")
-        print(f"[OK] Creato archivio unificato: {combined_csv} ({len(combined_df)} righe, date in DD/MM/AAAA)")
+        print(f"[ERRORE] Impossibile elaborare {code} ({url}): {exc}")
+        return pd.DataFrame(), pd.DataFrame()
 
 
 def main() -> None:
     ensure_dir(OUTPUT_DIR)
-    print("=== Aggiornamento dati ComboGesss (Formato data DD/MM/AAAA) ===")
+    print("=== Aggiornamento dati ComboGesss da FBref ===")
     export_countries_catalog(OUTPUT_DIR)
-    download_fixtures_excel(os.path.join(OUTPUT_DIR, "fixtures.xlsx"))
-    sync_euro_excel(OUTPUT_DIR)
-    download_leagues_data(SEASON, OUTPUT_DIR)
+
+    scraper = cloudscraper.create_scraper()
+    all_frames = []
+    future_frames = []
+    excel_sheets = {}
+
+    for code, (country, flag, league_name, url) in LEAGUES.items():
+        df_all, df_fut = parse_fbref_league(scraper, code, country, flag, league_name, url)
+        if not df_all.empty:
+            csv_path = os.path.join(OUTPUT_DIR, f"{code}.csv")
+            df_all.to_csv(csv_path, index=False, encoding="utf-8")
+            all_frames.append(df_all)
+            excel_sheets[code] = df_all
+        if not df_fut.empty:
+            future_frames.append(df_fut)
+
+        # Pausa anti-ban obbligatoria tra un campionato e l'altro
+        time.sleep(5)
+
+    if all_frames:
+        combined_df = pd.concat(all_frames, ignore_index=True)
+        combined_csv = os.path.join(OUTPUT_DIR, "all_leagues.csv")
+        combined_df.to_csv(combined_csv, index=False, encoding="utf-8")
+        print(f"[OK] Creato archivio unificato: {combined_csv} ({len(combined_df)} righe)")
+
+        euro_excel_path = os.path.join(OUTPUT_DIR, EURO_EXCEL_NAME)
+        with pd.ExcelWriter(euro_excel_path, engine="openpyxl") as writer:
+            for sheet_code, sheet_df in excel_sheets.items():
+                sheet_df.to_excel(writer, sheet_name=sheet_code, index=False)
+        print(f"[OK] Creato Excel campionati: {euro_excel_path}")
+
+    if future_frames:
+        fixtures_df = pd.concat(future_frames, ignore_index=True)
+        fixtures_path = os.path.join(OUTPUT_DIR, "fixtures.xlsx")
+        fixtures_df.to_excel(fixtures_path, index=False, engine="openpyxl")
+        print(f"[OK] Creato file partite future: {fixtures_path} ({len(fixtures_df)} partite)")
+
     print("=== Completato ===")
 
 
