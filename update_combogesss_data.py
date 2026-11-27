@@ -6,13 +6,12 @@ from urllib.parse import urljoin
 import pandas as pd
 import requests
 
-BASE_URL = "https://football-data.co.uk"
-OPENFOOTBALL_BASE = "https://githubusercontent.com"
+BASE_FD = "https://" + "www.football-data.co.uk/"
+BASE_OF = "https://" + "://githubusercontent.com"
 SEASON = "2627"
 OUTPUT_DIR = "data"
-EURO_EXCEL_NAME = "all-euro-data-2026-2027.xlsx"
+EURO_EXCEL = "all-euro-data-2026-2027.xlsx"
 
-# Codice -> (Nazione, Bandiera, Nome Campionato, File OpenFootball opzionale)
 LEAGUES = {
     "I1": ("Italia", "🇮🇹", "Serie A", "it.1.json"),
     "I2": ("Italia", "🇮🇹", "Serie B", "it.2.json"),
@@ -38,156 +37,36 @@ LEAGUES = {
     "G1": ("Grecia", "🇬🇷", "Super League", "gr.1.json"),
 }
 
-# Normalizzazione nomi squadra: OpenFootball -> Football-Data.co.uk
-TEAM_MAP = {
-    # Italia
-    "FC Internazionale Milano": "Inter",
-    "Internazionale": "Inter",
-    "AC Milan": "Milan",
-    "AS Roma": "Roma",
-    "SS Lazio": "Lazio",
-    "SSC Napoli": "Napoli",
-    "Juventus FC": "Juventus",
-    "Atalanta BC": "Atalanta",
-    "ACF Fiorentina": "Fiorentina",
-    "Bologna FC 1909": "Bologna",
-    "Torino FC": "Torino",
-    "Udinese Calcio": "Udinese",
-    "Genoa CFC": "Genoa",
-    "Cagliari Calcio": "Cagliari",
-    "Hellas Verona FC": "Verona",
-    "Hellas Verona": "Verona",
-    "US Lecce": "Lecce",
-    "Parma Calcio 1913": "Parma",
-    "Como 1907": "Como",
-    "AC Monza": "Monza",
-    "Venezia FC": "Venezia",
-    "Empoli FC": "Empoli",
-    "US Sassuolo Calcio": "Sassuolo",
-    "Frosinone Calcio": "Frosinone",
-    # Inghilterra
-    "Manchester United FC": "Man United",
-    "Manchester United": "Man United",
-    "Manchester City FC": "Man City",
-    "Manchester City": "Man City",
-    "Newcastle United FC": "Newcastle",
-    "Newcastle United": "Newcastle",
-    "Nottingham Forest FC": "Nott'm Forest",
-    "Nottingham Forest": "Nott'm Forest",
-    "Wolverhampton Wanderers FC": "Wolves",
-    "Wolverhampton Wanderers": "Wolves",
-    "West Ham United FC": "West Ham",
-    "West Ham United": "West Ham",
-    "Tottenham Hotspur FC": "Tottenham",
-    "Tottenham Hotspur": "Tottenham",
-    "Brighton & Hove Albion FC": "Brighton",
-    "Brighton & Hove Albion": "Brighton",
-    "Leicester City FC": "Leicester",
-    "Ipswich Town FC": "Ipswich",
-    "Arsenal FC": "Arsenal",
-    "Chelsea FC": "Chelsea",
-    "Liverpool FC": "Liverpool",
-    "Everton FC": "Everton",
-    "Fulham FC": "Fulham",
-    "Brentford FC": "Brentford",
-    "Crystal Palace FC": "Crystal Palace",
-    "AFC Bournemouth": "Bournemouth",
-    "Aston Villa FC": "Aston Villa",
-    "Southampton FC": "Southampton",
-    # Spagna
-    "FC Barcelona": "Barcelona",
-    "Real Madrid CF": "Real Madrid",
-    "Club Atlético de Madrid": "Ath Madrid",
-    "Atlético Madrid": "Ath Madrid",
-    "Athletic Club": "Ath Bilbao",
-    "Real Sociedad de Fútbol": "Sociedad",
-    "Real Betis Balompié": "Betis",
-    "Villarreal CF": "Villarreal",
-    "Sevilla FC": "Sevilla",
-    "Valencia CF": "Valencia",
-    "RC Celta de Vigo": "Celta",
-    "Celta Vigo": "Celta",
-    "CA Osasuna": "Osasuna",
-    "Getafe CF": "Getafe",
-    "Rayo Vallecano de Madrid": "Vallecano",
-    "Rayo Vallecano": "Vallecano",
-    "RCD Mallorca": "Mallorca",
-    "Deportivo Alavés": "Alaves",
-    "UD Las Palmas": "Las Palmas",
-    "Girona FC": "Girona",
-    "RCD Espanyol de Barcelona": "Espanol",
-    "RCD Espanyol": "Espanol",
-    "Real Valladolid CF": "Valladolid",
-    "CD Leganés": "Leganes",
-    # Germania
-    "FC Bayern München": "Bayern Munich",
-    "Bayern München": "Bayern Munich",
-    "Borussia Dortmund": "Dortmund",
-    "Bayer 04 Leverkusen": "Leverkusen",
-    "RB Leipzig": "RB Leipzig",
-    "Eintracht Frankfurt": "Ein Frankfurt",
-    "VfB Stuttgart": "Stuttgart",
-    "Borussia Mönchengladbach": "M'gladbach",
-    "VfL Wolfsburg": "Wolfsburg",
-    "SC Freiburg": "Freiburg",
-    "TSG 1899 Hoffenheim": "Hoffenheim",
-    "1. FSV Mainz 05": "Mainz",
-    "FC Augsburg": "Augsburg",
-    "SV Werder Bremen": "Werder Bremen",
-    "1. FC Union Berlin": "Union Berlin",
-    "VfL Bochum 1848": "Bochum",
-    "1. FC Heidenheim 1846": "Heidenheim",
-    "FC St. Pauli 1910": "St Pauli",
-    "Holstein Kiel": "Holstein Kiel",
-    # Francia
-    "Paris Saint-Germain FC": "Paris SG",
-    "Paris Saint-Germain": "Paris SG",
-    "Olympique de Marseille": "Marseille",
-    "AS Monaco FC": "Monaco",
-    "AS Monaco": "Monaco",
-    "Olympique Lyonnais": "Lyon",
-    "LOSC Lille": "Lille",
-    "OGC Nice": "Nice",
-    "RC Lens": "Lens",
-    "Stade Rennais FC 1901": "Rennes",
-    "Stade Brestois 29": "Brest",
-    "RC Strasbourg Alsace": "Strasbourg",
-    "FC Nantes": "Nantes",
-    "Toulouse FC": "Toulouse",
-    "Montpellier HSC": "Montpellier",
-    "Stade de Reims": "Reims",
-    "AJ Auxerre": "Auxerre",
-    "Angers SCO": "Angers",
-    "AS Saint-Étienne": "St Etienne",
-    "Le Havre AC": "Le Havre",
+ALIASES = {
+    "fc internazionale milano": "Inter", "internazionale": "Inter", "ac milan": "Milan",
+    "juventus fc": "Juventus", "ssc napoli": "Napoli", "as roma": "Roma", "ss lazio": "Lazio",
+    "atalanta bc": "Atalanta", "acf fiorentina": "Fiorentina", "bologna fc 1909": "Bologna",
+    "torino fc": "Torino", "udinese calcio": "Udinese", "genoa cfc": "Genoa",
+    "cagliari calcio": "Cagliari", "hellas verona fc": "Verona", "us lecce": "Lecce",
+    "parma calcio 1913": "Parma", "como 1907": "Como", "ac monza": "Monza", "venezia fc": "Venezia",
+    "empoli fc": "Empoli", "us sassuolo calcio": "Sassuolo", "frosinone calcio": "Frosinone",
+    "manchester united fc": "Man United", "manchester city fc": "Man City",
+    "tottenham hotspur fc": "Tottenham", "newcastle united fc": "Newcastle",
+    "west ham united fc": "West Ham", "wolverhampton wanderers fc": "Wolves",
+    "nottingham forest fc": "Nott'm Forest", "brighton & hove albion fc": "Brighton",
+    "leicester city fc": "Leicester", "ipswich town fc": "Ipswich", "afc bournemouth": "Bournemouth",
+    "crystal palace fc": "Crystal Palace", "aston villa fc": "Aston Villa", "arsenal fc": "Arsenal",
+    "chelsea fc": "Chelsea", "liverpool fc": "Liverpool", "everton fc": "Everton",
+    "fulham fc": "Fulham", "brentford fc": "Brentford", "southampton fc": "Southampton",
+    "real madrid cf": "Real Madrid", "fc barcelona": "Barcelona", "club atlético de madrid": "Ath Madrid",
+    "athletic club": "Ath Bilbao", "real sociedad de fútbol": "Sociedad", "real betis balompié": "Betis",
+    "villarreal cf": "Villarreal", "sevilla fc": "Sevilla", "valencia cf": "Valencia",
+    "rc celta de vigo": "Celta", "fc bayern münchen": "Bayern Munich", "borussia dortmund": "Dortmund",
+    "bayer 04 leverkusen": "Leverkusen", "rb leipzig": "RB Leipzig", "eintracht frankfurt": "Ein Frankfurt",
+    "vfb stuttgart": "Stuttgart", "borussia mönchengladbach": "M'gladbach",
+    "paris saint-germain fc": "Paris SG", "olympique de marseille": "Marseille",
+    "olympique lyonnais": "Lyon", "as monaco fc": "Monaco", "lille osc": "Lille", "ogc nice": "Nice",
 }
 
-HEADERS = {"User-Agent": "Mozilla/5.0 (compatible; ComboGesssUpdater/2.0)"}
+HEADERS = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
 
 
-def ensure_dir(path: str) -> None:
-    os.makedirs(path, exist_ok=True)
-
-
-def clean_team_name(raw_name: str, known_teams: set[str]) -> str:
-    name = str(raw_name or "").strip()
-    if name in TEAM_MAP:
-        return TEAM_MAP[name]
-    if name in known_teams:
-        return name
-    # Rimuove suffissi comuni (FC, CF, AC, AS, 1909, ecc.) per trovare corrispondenze
-    stripped = re.sub(r"\b(FC|CF|AC|AS|SC|SV|VfL|VfB|US|SS|SSC|ACF|UD|CD|RC|RCD|CA|OGC|LOSC|AJ|1\.)\b", "", name).strip()
-    stripped = re.sub(r"\b\d{4}\b", "", stripped).strip()
-    stripped = re.sub(r"\s+", " ", stripped)
-    if stripped in TEAM_MAP:
-        return TEAM_MAP[stripped]
-    for kt in known_teams:
-        if kt.lower() == stripped.lower() or kt.lower() in stripped.lower() or stripped.lower() in kt.lower():
-            return kt
-    return stripped or name
-
-
-def normalize_date_dd_mm_yyyy(val) -> str:
+def norm_date(val) -> str:
     if val is None or (isinstance(val, float) and pd.isna(val)):
         return ""
     if isinstance(val, (pd.Timestamp, datetime)):
@@ -198,66 +77,138 @@ def normalize_date_dd_mm_yyyy(val) -> str:
     s = str(val).strip()
     if not s or s.lower() in {"nan", "nat", "none"}:
         return ""
-    date_part = re.split(r"[\sT]+", s)[0]
-    m_dmy = re.fullmatch(r"(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})", date_part)
-    if m_dmy:
-        y = int(m_dmy.group(3))
-        if y < 100:
-            y += 1900 if y >= 70 else 2000
-        return f"{int(m_dmy.group(1)):02d}/{int(m_dmy.group(2)):02d}/{y:04d}"
-    m_ymd = re.fullmatch(r"(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})", date_part)
-    if m_ymd:
-        return f"{int(m_ymd.group(3)):02d}/{int(m_ymd.group(2)):02d}/{int(m_ymd.group(1)):04d}"
+    p = re.split(r"[\sT]+", s)
+    m1 = re.fullmatch(r"(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})", p)
+    if m1:
+        y = int(m1.group(3)) + (2000 if int(m1.group(3)) < 100 else 0)
+        return f"{int(m1.group(1)):02d}/{int(m1.group(2)):02d}/{y:04d}"
+    m2 = re.fullmatch(r"(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})", p)
+    if m2:
+        return f"{int(m2.group(3)):02d}/{int(m2.group(2)):02d}/{int(m2.group(1)):04d}"
     return s
 
 
-def normalize_df_dates(df: pd.DataFrame) -> pd.DataFrame:
-    if df is None or df.empty:
-        return df
-    for col in df.columns:
-        if str(col).strip().lower() in {"date", "matchdate", "data"}:
-            df[col] = df[col].apply(normalize_date_dd_mm_yyyy)
-    return df
+def norm_team(raw: str, known: dict) -> str:
+    c = str(raw or "").strip()
+    low = c.lower()
+    if low in ALIASES:
+        return ALIASES[low]
+    if low in known:
+        return known[low]
+    st = re.sub(r"\b(fc|cf|ac|as|ss|ssc|us|uc|ud|cd|rc|rcd|sc|vfb|vfl|tsg|sv|fsv|1\.)\b", "", low).strip()
+    st = re.sub(r"\s+", " ", st)
+    if st in known:
+        return known[st]
+    for k, orig in known.items():
+        if k in st or st in k:
+            return orig
+    return c
 
 
-def export_countries_catalog(out_dir: str) -> None:
-    grouped = {}
-    for code, (country, flag, league_name, _) in LEAGUES.items():
-        if country not in grouped:
-            grouped[country] = {"country": country, "flag": flag, "leagues": []}
-        grouped[country]["leagues"].append({"code": code, "name": league_name})
-    out_path = os.path.join(out_dir, "countries_leagues.json")
-    with open(out_path, "w", encoding="utf-8") as f:
-        json.dump(list(grouped.values()), f, ensure_ascii=False, indent=2)
-    print(f"[OK] Creato catalogo nazioni/campionati: {out_path}")
-
-
-def download_file(url: str, dest_path: str) -> bool:
+def download_file(url: str, dest: str) -> bool:
     try:
-        resp = requests.get(url, headers=HEADERS, timeout=30)
-        resp.raise_for_status()
-        with open(dest_path, "wb") as f:
-            f.write(resp.content)
-        print(f"[OK] Scaricato: {url}")
+        r = requests.get(url, headers=HEADERS, timeout=25)
+        if r.status_code != 200:
+            print(f"[AVVISO] HTTP {r.status_code} su {url}")
+            return False
+        with open(dest, "wb") as f:
+            f.write(r.content)
+        print(f"[OK] Scaricato {os.path.basename(dest)}")
         return True
-    except Exception as exc:
-        print(f"[AVVISO] Impossibile scaricare {url}: {exc}")
+    except Exception as e:
+        print(f"[ERR] {url}: {e}")
         return False
 
 
-def sync_euro_excel(out_dir: str) -> None:
-    local_excel = os.path.join(out_dir, EURO_EXCEL_NAME)
-    candidate_url = urljoin(BASE_URL, f"mmz4281/{SEASON}/{EURO_EXCEL_NAME}")
-    download_file(candidate_url, local_excel)
-    if os.path.exists(local_excel):
+def main() -> None:
+    os.makedirs(OUTPUT_DIR, exist_ok=True)
+    print("=== Avvio aggiornamento ComboGesss ===")
+
+    # 1. Esporta catalogo nazioni e campionati
+    grouped = {}
+    for code, (country, flag, name, _) in LEAGUES.items():
+        grouped.setdefault(country, {"country": country, "flag": flag, "leagues": []})["leagues"].append(
+            {"code": code, "name": name}
+        )
+    with open(os.path.join(OUTPUT_DIR, "countries_leagues.json"), "w", encoding="utf-8") as f:
+        json.dump(list(grouped.values()), f, ensure_ascii=False, indent=2)
+    print("[OK] Creato countries_leagues.json")
+
+    # 2. Scarica e normalizza Excel europeo generale
+    euro_path = os.path.join(OUTPUT_DIR, EURO_EXCEL)
+    if download_file(urljoin(BASE_FD, f"mmz4281/{SEASON}/{EURO_EXCEL}"), euro_path):
         try:
-            xl = pd.ExcelFile(local_excel)
-            frames = {sheet: normalize_df_dates(xl.parse(sheet)) for sheet in xl.sheet_names}
-            with pd.ExcelWriter(local_excel, engine="openpyxl") as writer:
-                for sheet, df in frames.items():
-                    df.to_excel(writer, sheet_name=sheet, index=False)
-            print(f"[OK] Normalizzato {local_excel}")
-        except Exception as exc:
-            print(f"[AVVISO] Normalizzazione {local_excel}: {exc}")
+            xl = pd.ExcelFile(euro_path)
+            sheets = {}
+            for s in xl.sheet_names:
+                df_s = xl.parse(s)
+                if "Date" in df_s.columns:
+                    df_s["Date"] = df_s["Date"].apply(norm_date)
+                sheets[s] = df_s
+            with pd.ExcelWriter(euro_path, engine="openpyxl") as writer:
+                for s, df_s in sheets.items():
+                    df_s.to_excel(writer, sheet_name=s, index=False)
+            print(f"[OK] Normalizzato {EURO_EXCEL}")
+        except Exception as e:
+            print(f"[AVVISO] Normalizzazione {EURO_EXCEL}: {e}")
 
+    # 3. Scarica fixtures.xlsx (con fallback su matches.php)
+    fix_path = os.path.join(OUTPUT_DIR, "fixtures.xlsx")
+    fd_fix = pd.DataFrame()
+    if not download_file(urljoin(BASE_FD, "fixtures.xlsx"), fix_path):
+        try:
+            mp = urljoin(BASE_FD, "matches.php")
+            resp = requests.get(mp, headers=HEADERS, timeout=25)
+            links = re.findall(r'href=["\']([^"\']*\.(?:xlsx|xls|csv))["\']', resp.text, re.I)
+            for href in links:
+                if "fix" in href.lower() or "match" in href.lower():
+                    if download_file(urljoin(mp, href), fix_path):
+                        break
+        except Exception as e:
+            print(f"[AVVISO] Fallback matches.php: {e}")
 
+    if os.path.exists(fix_path):
+        try:
+            fd_fix = pd.read_excel(fix_path)
+            if "Date" in fd_fix.columns:
+                fd_fix["Date"] = fd_fix["Date"].apply(norm_date)
+        except Exception as e:
+            print(f"[AVVISO] Lettura fixtures.xlsx: {e}")
+
+    # 4. Scarica CSV per ogni campionato + calendario completo OpenFootball
+    frames = []
+    extra = []
+    for code, (country, flag, name, of_file) in LEAGUES.items():
+        csv_path = os.path.join(OUTPUT_DIR, f"{code}.csv")
+        known = {}
+        played = set()
+
+        if download_file(f"{BASE_FD}mmz4281/{SEASON}/{code}.csv", csv_path):
+            try:
+                df = pd.read_csv(csv_path, encoding="utf-8-sig", on_bad_lines="skip")
+                if "Date" in df.columns:
+                    df["Date"] = df["Date"].apply(norm_date)
+                df["Country"], df["Flag"], df["LeagueName"], df["DivCode"] = country, flag, name, code
+                df.to_csv(csv_path, index=False, encoding="utf-8")
+                frames.append(df)
+
+                for _, r in df.iterrows():
+                    h, a = str(r.get("HomeTeam", "")).strip(), str(r.get("AwayTeam", "")).strip()
+                    if h:
+                        known[h.lower()] = h
+                    if a:
+                        known[a.lower()] = a
+                    if pd.notna(r.get("FTHG")) and pd.notna(r.get("FTAG")):
+                        played.add((h.lower(), a.lower()))
+            except Exception as e:
+                print(f"[AVVISO] Elaborazione CSV {code}: {e}")
+
+        if of_file:
+            try:
+                res = requests.get(urljoin(BASE_OF, of_file), headers=HEADERS, timeout=20)
+                if res.status_code == 200:
+                    count_of = 0
+                    for m in res.json().get("matches", []):
+                        if m.get("score", {}).get("ft"):
+                            continue
+                        d_str = norm_date(m.get("date", ""))
