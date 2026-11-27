@@ -67,7 +67,7 @@ def ndate(v):
     if isinstance(v, (pd.Timestamp, datetime)): return v.strftime("%d/%m/%Y")
     if isinstance(v, (int, float)): return (datetime(1899, 12, 30, tzinfo=timezone.utc) + timedelta(days=int(float(v)))).strftime("%d/%m/%Y")
     s = str(v).strip()
-    p = re.split(r"[\sT]+", s)
+    p = re.split(r"[\sT]+", s)[0]
     m = re.fullmatch(r"(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})", p)
     if m: return f"{int(m.group(1)):02d}/{int(m.group(2)):02d}/{int(m.group(3)) + (2000 if int(m.group(3)) < 100 else 0):04d}"
     m = re.fullmatch(r"(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})", p)
