@@ -1,6 +1,7 @@
 import json, os, re, time
 from datetime import datetime, timedelta, timezone
 from urllib.parse import urljoin
+from bs4 import BeautifulSoup
 import pandas as pd
 import requests
 
@@ -83,10 +84,13 @@ def nteam(raw, known):
 def dl(url, dest):
     try:
         r = requests.get(url, headers=HDR, timeout=25)
-        if r.status_code != 200: return False
+        if r.status_code != 200:
+            print(f"[FD HTTP {r.status_code}] {url}")
+            return False
         with open(dest, "wb") as f: f.write(r.content)
         return True
-    except Exception:
+    except Exception as e:
+        print(f"[FD ERR] {url}: {e}")
         return False
 
 def fetch_softvision(slug, code, known, played):
@@ -97,22 +101,22 @@ def fetch_softvision(slug, code, known, played):
         if r.status_code != 200:
             print(f"[SV HTTP {r.status_code}] {url}")
             return []
-        tables = pd.read_html(r.text)
+        soup = BeautifulSoup(r.text, "html.parser")
         out = []
-        for t in tables:
-            if t.shape.pop(1) < 3: continue
-            for _, row in t.iterrows():
-                vals = list(row)
-                c0 = str(vals.pop(0)).strip()
-                c1 = str(vals.pop(0)).strip()
-                c2 = str(vals.pop(0)).strip() if vals and pd.notna(vals.pop(0)) else ""
-                if re.fullmatch(r"\d{2}/\d{2}/\d{4}", c0) and " - " in c1:
-                    if not re.search(r"\d+\s*-\s*\d+", c2):
-                        h_raw, a_raw = c1.split(" - ", 1)
-                        h = nteam(h_raw, known)
-                        a = nteam(a_raw, known)
-                        if (h.lower(), a.lower()) not in played:
-                            out.append({"Div": code, "Date": c0, "Time": "15:00", "HomeTeam": h, "AwayTeam": a})
+        for tr in soup.find_all("tr"):
+            tds = [td.get_text(" ", strip=True) for td in tr.find_all(["td", "th"])]
+            if len(tds) < 2: continue
+            m_date = re.search(r"(\d{2}/\d{2}/\d{4})", tds.pop(0))
+            if not m_date: continue
+            date_str = m_date.group(1)
+            match_txt = tds.pop(0) if tds else ""
+            res_txt = tds.pop(0) if tds else ""
+            if " - " in match_txt and not re.search(r"\d+\s*-\s*\d+", res_txt):
+                h_raw, a_raw = match_txt.split(" - ", 1)
+                h = nteam(h_raw, known)
+                a = nteam(a_raw, known)
+                if (h.lower(), a.lower()) not in played:
+                    out.append({"Div": code, "Date": date_str, "Time": "15:00", "HomeTeam": h, "AwayTeam": a})
         print(f"[SV OK] {code}: +{len(out)} partite future")
         return out
     except Exception as e:
@@ -128,13 +132,27 @@ def main():
         json.dump(list(grouped.values()), f, ensure_ascii=False, indent=2)
 
     euro_path = os.path.join(OUT, EURO_XLSX)
-    dl(urljoin(FD_URL, f"mmz4281/{SEASON}/{EURO_XLSX}"), euro_path)
+    if dl(urljoin(FD_URL, f"mmz4281/{SEASON}/{EURO_XLSX}"), euro_path):
+        try:
+            xl = pd.ExcelFile(euro_path)
+            sheets = {}
+            for s in xl.sheet_names:
+                df_s = xl.parse(s)
+                if "Date" in df_s.columns: df_s["Date"] = df_s["Date"].apply(ndate)
+                sheets[s] = df_s
+            with pd.ExcelWriter(euro_path, engine="openpyxl") as w:
+                for s, df_s in sheets.items(): df_s.to_excel(w, sheet_name=s, index=False)
+        except Exception as e:
+            print(f"[XLSX ERR] {e}")
 
     fix_path = os.path.join(OUT, "fixtures.xlsx")
     fd_fix = pd.DataFrame()
     if dl(urljoin(FD_URL, "fixtures.xlsx"), fix_path):
-        fd_fix = pd.read_excel(fix_path)
-        if "Date" in fd_fix.columns: fd_fix["Date"] = fd_fix["Date"].apply(ndate)
+        try:
+            fd_fix = pd.read_excel(fix_path)
+            if "Date" in fd_fix.columns: fd_fix["Date"] = fd_fix["Date"].apply(ndate)
+        except Exception as e:
+            print(f"[FIX ERR] {e}")
 
     frames, extra = [], []
     for code, (country, flag, name, sv_slug) in LEAGUES.items():
@@ -153,11 +171,12 @@ def main():
                 if pd.notna(r.get("FTHG")) and pd.notna(r.get("FTAG")): played.add((h.lower(), a.lower()))
 
         extra.extend(fetch_softvision(sv_slug, code, known, played))
-        time.sleep(0.5)
+        time.sleep(0.4)
 
     if frames:
         all_df = pd.concat(frames, ignore_index=True)
         all_df.to_csv(os.path.join(OUT, "all_leagues.csv"), index=False, encoding="utf-8")
+        print(f"[OK] Salvato all_leagues.csv ({len(all_df)} righe)")
 
     sv_df = pd.DataFrame(extra) if extra else pd.DataFrame(columns=["Div", "Date", "Time", "HomeTeam", "AwayTeam"])
     if not fd_fix.empty and {"Div", "HomeTeam", "AwayTeam"}.issubset(fd_fix.columns):
