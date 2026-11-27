@@ -813,6 +813,18 @@
       viewMode: "form"
     };
 
+    /* Giornata da mostrare di default: l'ultima con almeno un risultato;
+       se è completata (tutte le partite hanno il risultato) passa alla successiva. */
+    function pickDefaultRound(rounds) {
+      if (!rounds || !rounds.length) return 1;
+      let last = -1;
+      rounds.forEach((r, i) => { if ((r.matches || []).some(m => m.ftResult)) last = i; });
+      if (last < 0) return rounds[0].roundNumber;
+      const complete = rounds[last].matches.every(m => m.ftResult);
+      const idx = complete ? Math.min(last + 1, rounds.length - 1) : last;
+      return rounds[idx].roundNumber;
+    }
+
     function getTodayStr() {
       const d = new Date();
       return `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}/${d.getFullYear()}`;
@@ -1343,7 +1355,7 @@
 
       state.roundsByLeague = organizeMatchesIntoRounds(state.resultsRows, state.fixturesRows);
       const leagueRounds = state.roundsByLeague[state.selectedLeagueCode] || [];
-      state.selectedRound = leagueRounds.length ? leagueRounds[leagueRounds.length - 1].roundNumber : 1;
+      state.selectedRound = pickDefaultRound(leagueRounds);
 
       if (loadedAny) {
         statusEl.textContent = `Dati caricati: ${state.resultsRows.length} risultati • ${state.fixturesRows.length} partite future`;
@@ -1631,7 +1643,7 @@
       if (nation && nation.leagues.length) {
         state.selectedLeagueCode = nation.leagues[0].code;
         const rounds = state.roundsByLeague[state.selectedLeagueCode] || [];
-        state.selectedRound = rounds.length ? rounds[rounds.length - 1].roundNumber : 1;
+        state.selectedRound = pickDefaultRound(rounds);
       }
       renderAll();
     }
@@ -1639,7 +1651,7 @@
     function selectLeague(code) {
       state.selectedLeagueCode = code;
       const rounds = state.roundsByLeague[code] || [];
-      state.selectedRound = rounds.length ? rounds[rounds.length - 1].roundNumber : 1;
+      state.selectedRound = pickDefaultRound(rounds);
       renderAll();
     }
 
