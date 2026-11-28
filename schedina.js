@@ -31,6 +31,45 @@
     try { localStorage.setItem(DEF_KEY, JSON.stringify(getDefaults())); } catch (_) {}
   }
   function resetDefaults() { try { localStorage.removeItem(DEF_KEY); } catch (_) {} DEF_FIELDS.forEach(k => ST[k] = DEF_FACTORY[k]); }
+
+  /* ---------- Filtri: campionati e famiglie di giocate ----------
+     Si memorizzano le voci DISATTIVATE: così un campionato o una famiglia nuova
+     risulta attiva di default. */
+  const FLT_KEY = "combogesss_schedina_filters";
+  ST.offLeagues = {}; ST.offFamilies = {}; ST.families = [];
+  try {
+    const f = JSON.parse(localStorage.getItem(FLT_KEY) || "null");
+    if (f) { ST.offLeagues = f.offLeagues || {}; ST.offFamilies = f.offFamilies || {}; }
+  } catch (_) {}
+  function saveFilters() {
+    try { localStorage.setItem(FLT_KEY, JSON.stringify({ offLeagues: ST.offLeagues, offFamilies: ST.offFamilies })); } catch (_) {}
+  }
+  function allLeagues() {
+    const out = [];
+    if (typeof NATIONS !== "undefined") for (const n of NATIONS) for (const l of n.leagues) out.push({ code: l.code, name: l.name, flag: n.emojiFlag, country: n.name });
+    return out;
+  }
+  /* Le famiglie si leggono dai dati reali (qualche partita per campionato). */
+  function discoverFamilies() {
+    try {
+      if (typeof window.computeMatchCandidates !== "function" || typeof state === "undefined") return;
+      const seen = new Set(ST.families.concat(Object.keys(ST.offFamilies)));
+      const rbl = state.roundsByLeague || {};
+      for (const code of Object.keys(rbl)) {
+        let n = 0;
+        for (const round of rbl[code] || []) {
+          for (const m of round.matches) {
+            if (m.ftResult) continue;
+            const c = window.computeMatchCandidates(m, code, state.resultsRows);
+            (c.real || []).concat(c.dixon || []).forEach(x => { if (x.family) seen.add(x.family); });
+            if (++n >= 3) break;
+          }
+          if (n >= 3) break;
+        }
+      }
+      ST.families = Array.from(seen);
+    } catch (_) {}
+  }
   function settle(legs) {
     const sts = (legs || []).map(legStatus);
     if (sts.includes(false)) return "lost";
@@ -99,7 +138,7 @@
   function gatherMatches() {
     const out = [];
     const rbl = state.roundsByLeague || {};
-    const codes = ST.scope === "league" ? [state.selectedLeagueCode] : Object.keys(rbl);
+    const codes = ST.scope === "league" ? [state.selectedLeagueCode] : Object.keys(rbl).filter(c => !ST.offLeagues[c]);
     const days = { "1d": 1, "3d": 3, "7d": 7 }[ST.scope] || 0;
     const today = todayUtc();
     for (const code of codes) for (const round of rbl[code] || []) for (const m of round.matches) {
@@ -133,7 +172,7 @@
       }
     }
     return list
-      .filter(x => x.pct >= ST.minPct && x.odd >= 1.12 && (ST.includeFair || x.oddType === "Quota"))
+      .filter(x => !ST.offFamilies[x.family] && x.pct >= ST.minPct && x.odd >= 1.12 && (ST.includeFair || x.oddType === "Quota"))
       .sort((a, b) => b.pct - a.pct)
       .slice(0, 6)
       .map(x => Object.assign({}, x, {
@@ -209,6 +248,7 @@
   }
 
   function generate() {
+    discoverFamilies(); renderFilters();
     $("#sk-results").innerHTML = `<div class="sk-msg">Calcolo in corso…</div>`;
     setTimeout(() => {
       try { run(); } catch (e) {
@@ -267,7 +307,7 @@
     const info = ST.info || {};
     if (!ST.all.length) {
       box.innerHTML = `<div class="sk-msg">Nessuna schedina trovata (${info.matches || 0} partite, ${info.withPicks || 0} con giocate valide).<br>
-        Prova ad allargare la tolleranza, abbassare la probabilità minima, ampliare l’ambito o aumentare il numero di eventi.${Object.keys(ST.locked).length ? "<br>Hai eventi bloccati: prova a sbloccarne qualcuno." : ""}</div>`;
+        Controlla anche i filtri su campionati e famiglie. Prova ad allargare la tolleranza, abbassare la probabilità minima, ampliare l’ambito o aumentare il numero di eventi.${Object.keys(ST.locked).length ? "<br>Hai eventi bloccati: prova a sbloccarne qualcuno." : ""}</div>`;
       return;
     }
     ST.saved = ST.saved || {};
@@ -347,6 +387,12 @@
     else if (act === "conto") { if (window.CGConto) window.CGConto.addFromSchedina(ST.all[+t.dataset.idx], t); }
     else if (act === "conto-h") { const s = loadSaved()[+t.dataset.i]; if (s && window.CGConto) window.CGConto.addFromSchedina(s, t); }
     else if (act === "del") { const a = loadSaved(); a.splice(+t.dataset.i, 1); storeSaved(a); renderHistory(); }
+    else if (act === "lg") { const c = t.dataset.code; if (ST.offLeagues[c]) delete ST.offLeagues[c]; else ST.offLeagues[c] = true; saveFilters(); renderFilters(); }
+    else if (act === "lg-all") { ST.offLeagues = {}; saveFilters(); renderFilters(); }
+    else if (act === "lg-none") { allLeagues().forEach(l => ST.offLeagues[l.code] = true); saveFilters(); renderFilters(); }
+    else if (act === "fam") { const f = t.dataset.fam; if (ST.offFamilies[f]) delete ST.offFamilies[f]; else ST.offFamilies[f] = true; saveFilters(); renderFilters(); }
+    else if (act === "fam-all") { ST.offFamilies = {}; saveFilters(); renderFilters(); }
+    else if (act === "fam-none") { ST.families.forEach(f => ST.offFamilies[f] = true); saveFilters(); renderFilters(); }
     else if (act === "chip") { $("#sk-target").value = t.dataset.v; ST.target = +t.dataset.v; }
   }
 
@@ -361,6 +407,33 @@
     else if (id === "sk-scope") ST.scope = v;
     else if (id === "sk-pct") ST.minPct = +v;
     else if (id === "sk-fair") ST.includeFair = e.target.checked;
+  }
+
+  function renderFilters() {
+    const lgs = allLeagues();
+    const lb = $("#sk-lg-box"), fb = $("#sk-fam-box");
+    if (lb) {
+      const on = lgs.filter(l => !ST.offLeagues[l.code]).length;
+      lb.innerHTML = `
+        <div class="sk-fh">
+          <b>🏆 Campionati <span class="sk-dim sk-small">${on}/${lgs.length} attivi</span></b>
+          <span><button class="sk-btn sk-mini" data-act="lg-all">Tutti</button> <button class="sk-btn sk-mini" data-act="lg-none">Nessuno</button></span>
+        </div>
+        <div class="sk-grid">${lgs.map(l => `<button type="button" class="sk-tile ${ST.offLeagues[l.code] ? "off" : "on"}" data-act="lg" data-code="${esc(l.code)}" title="${esc(l.country)}"><span class="sk-tile-f">${l.flag || ""}</span><span>${esc(l.name)}</span></button>`).join("")}</div>
+        <div class="sk-dim sk-small sk-hint">Con ambito “Campionato selezionato” questa griglia viene ignorata.</div>`;
+    }
+    if (fb) {
+      const fams = ST.families;
+      const on = fams.filter(f => !ST.offFamilies[f]).length;
+      fb.innerHTML = `
+        <div class="sk-fh">
+          <b>🎯 Famiglie di giocate <span class="sk-dim sk-small">${fams.length ? `${on}/${fams.length} attive` : ""}</span></b>
+          <span><button class="sk-btn sk-mini" data-act="fam-all">Tutte</button> <button class="sk-btn sk-mini" data-act="fam-none">Nessuna</button></span>
+        </div>
+        ${fams.length
+          ? `<div class="sk-grid sk-grid-f">${fams.map(f => `<button type="button" class="sk-tile ${ST.offFamilies[f] ? "off" : "on"}" data-act="fam" data-fam="${esc(f)}"><span>${esc(f)}</span></button>`).join("")}</div>`
+          : `<div class="sk-dim sk-small">Le famiglie compaiono appena i dati sono caricati (si aggiornano anche premendo “Genera”).</div>`}`;
+    }
   }
 
   function showTab() {
@@ -401,12 +474,15 @@
             <label>Prob. minima evento<select id="sk-pct">${opt(OPTS.pct, ST.minPct)}</select></label>
             <label class="sk-check"><input id="sk-fair" type="checkbox" ${ST.includeFair ? "checked" : ""}> Includi quote equa (stimate)</label>
           </div>
+          <div class="sk-card sk-fcard" id="sk-lg-box"></div>
+          <div class="sk-card sk-fcard" id="sk-fam-box"></div>
           <button class="sk-btn sk-primary sk-wide" data-act="gen">⚡ Genera schedine</button>
           <div id="sk-results"><div class="sk-msg">Imposta i parametri e premi “Genera”. Puoi bloccare 🔒 un evento e rigenerare per tenerlo fisso.</div></div>
         </div>
         <div id="sk-history" style="display:none"></div>
       </div>`;
     document.body.appendChild(ov);
+    discoverFamilies(); renderFilters();
     ov.addEventListener("click", onClick);
     ov.addEventListener("change", onChange);
     ov.addEventListener("input", e => { if (e.target.id === "sk-target") onChange(e); });
@@ -459,6 +535,16 @@
       #sk-overlay .sk-actions{display:flex;gap:8px;margin-top:10px}
       #sk-overlay .sk-msg{padding:22px;text-align:center;color:#b4d6f2;font-size:calc(13px * var(--cg-fs,1))}
       #sk-overlay .sk-stats{font-size:calc(13px * var(--cg-fs,1));line-height:1.7}
+      #sk-overlay .sk-fcard{margin:8px 0}
+      #sk-overlay .sk-fh{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:8px;font-size:calc(13px * var(--cg-fs,1))}
+      #sk-overlay .sk-fh .sk-mini{margin-top:0}
+      #sk-overlay .sk-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(128px,1fr));gap:6px}
+      #sk-overlay .sk-grid-f{grid-template-columns:repeat(auto-fill,minmax(96px,1fr))}
+      #sk-overlay .sk-tile{display:flex;align-items:center;justify-content:center;gap:6px;padding:8px 6px;border-radius:10px;border:1px solid rgba(34,211,238,.55);background:linear-gradient(135deg,rgba(8,145,178,.35),rgba(37,99,235,.35));color:#e6f4ff;font-weight:700;font-size:calc(12px * var(--cg-fs,1));cursor:pointer;transition:filter .15s,border-color .15s,box-shadow .15s}
+      #sk-overlay .sk-tile.on{box-shadow:0 0 10px rgba(34,211,238,.25)}
+      #sk-overlay .sk-tile.off{filter:brightness(.5);border-color:rgba(56,189,248,.18);box-shadow:none}
+      #sk-overlay .sk-tile:hover{border-color:#22d3ee}
+      #sk-overlay .sk-hint{margin-top:6px}
       @media(max-width:560px){#sk-overlay .sk-leg{grid-template-columns:1fr auto;} #sk-overlay .sk-ico{grid-column:2}}
     `;
     document.head.appendChild(s);
