@@ -46,7 +46,7 @@
   }
   function allLeagues() {
     const out = [];
-    if (typeof NATIONS !== "undefined") for (const n of NATIONS) for (const l of n.leagues) out.push({ code: l.code, name: l.name, flag: n.emojiFlag, country: n.name });
+    if (typeof NATIONS !== "undefined") for (const n of NATIONS) for (const l of n.leagues) out.push({ code: l.code, name: l.name, flag: n.emojiFlag, flagUrl: n.flagUrl, country: n.name });
     return out;
   }
   /* Le famiglie si leggono dai dati reali (qualche partita per campionato). */
@@ -419,7 +419,7 @@
           <b>🏆 Campionati <span class="sk-dim sk-small">${on}/${lgs.length} attivi</span></b>
           <span><button class="sk-btn sk-mini" data-act="lg-all">Tutti</button> <button class="sk-btn sk-mini" data-act="lg-none">Nessuno</button></span>
         </div>
-        <div class="sk-grid">${lgs.map(l => `<button type="button" class="sk-tile ${ST.offLeagues[l.code] ? "off" : "on"}" data-act="lg" data-code="${esc(l.code)}" title="${esc(l.country)}"><span class="sk-tile-f">${l.flag || ""}</span><span>${esc(l.name)}</span></button>`).join("")}</div>
+        <div class="sk-grid">${lgs.map(l => `<button type="button" class="sk-tile ${ST.offLeagues[l.code] ? "off" : "on"}" data-act="lg" data-code="${esc(l.code)}" title="${esc(l.country)}"><span class="sk-tile-f">${l.flagUrl ? `<img src="${esc(l.flagUrl)}" alt="${esc(l.country)}" loading="lazy" data-f="${esc(l.flag || "")}" onerror="this.replaceWith(document.createTextNode(this.dataset.f))">` : esc(l.flag || "")}</span><span>${esc(l.name)}</span></button>`).join("")}</div>
         <div class="sk-dim sk-small sk-hint">Con ambito “Campionato selezionato” questa griglia viene ignorata.</div>`;
     }
     if (fb) {
@@ -541,6 +541,8 @@
       #sk-overlay .sk-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(128px,1fr));gap:6px}
       #sk-overlay .sk-grid-f{grid-template-columns:repeat(auto-fill,minmax(96px,1fr))}
       #sk-overlay .sk-tile{display:flex;align-items:center;justify-content:center;gap:6px;padding:8px 6px;border-radius:10px;border:1px solid rgba(34,211,238,.55);background:linear-gradient(135deg,rgba(8,145,178,.35),rgba(37,99,235,.35));color:#e6f4ff;font-weight:700;font-size:calc(12px * var(--cg-fs,1));cursor:pointer;transition:filter .15s,border-color .15s,box-shadow .15s}
+      #sk-overlay .sk-tile-f{display:inline-flex;align-items:center}
+      #sk-overlay .sk-tile-f img{width:20px;height:14px;object-fit:cover;border-radius:2px;box-shadow:0 0 0 1px rgba(255,255,255,.25)}
       #sk-overlay .sk-tile.on{box-shadow:0 0 10px rgba(34,211,238,.25)}
       #sk-overlay .sk-tile.off{filter:brightness(.5);border-color:rgba(56,189,248,.18);box-shadow:none}
       #sk-overlay .sk-tile:hover{border-color:#22d3ee}
