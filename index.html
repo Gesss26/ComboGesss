@@ -661,6 +661,7 @@
     </div>
 
     <div id="checkSummaryCards" class="grid grid-cols-1 md:grid-cols-3 gap-3"></div>
+    <div id="checkFamiliesContainer"></div>
     <div id="checkLeaguesContainer" class="space-y-3"></div>
   </section>
 
@@ -835,6 +836,61 @@
       if (p >= 66.67) return "pct-green";
       if (p >= 33.34) return "pct-white";
       return "pct-red";
+    }
+
+    /* Medie gol e xG stimati (modello di forza attacco/difesa su casa/trasferta).
+       Nei dati non c'è un vero xG: è una stima da gol fatti/subiti nel campionato. */
+    const cgGoalCache = { ref: null, n: -1, byDiv: {} };
+    function cgGoalStats(div) {
+      const rows = state.resultsRows || [];
+      if (cgGoalCache.ref !== rows || cgGoalCache.n !== rows.length) {
+        cgGoalCache.ref = rows; cgGoalCache.n = rows.length; cgGoalCache.byDiv = {};
+        for (const r of rows) {
+          const d = String(r.Div || r.DivCode || "").trim().toUpperCase();
+          const h = String(r.HomeTeam || r.Home || "").trim(), a = String(r.AwayTeam || r.Away || "").trim();
+          if (!d || !h || !a || r.FTHG === undefined || r.FTHG === "" || r.FTAG === undefined || r.FTAG === "") continue;
+          const hg = Number(r.FTHG), ag = Number(r.FTAG);
+          if (!Number.isFinite(hg) || !Number.isFinite(ag)) continue;
+          const L = cgGoalCache.byDiv[d] || (cgGoalCache.byDiv[d] = { teams: {}, hf: 0, af: 0, n: 0 });
+          const T = t => L.teams[t] || (L.teams[t] = { hF: 0, hA: 0, hN: 0, aF: 0, aA: 0, aN: 0 });
+          const H = T(h), A = T(a);
+          H.hF += hg; H.hA += ag; H.hN++; A.aF += ag; A.aA += hg; A.aN++;
+          L.hf += hg; L.af += ag; L.n++;
+        }
+      }
+      return cgGoalCache.byDiv[String(div || "").toUpperCase()] || null;
+    }
+    function cgTeamGoalInfo(div, home, away) {
+      const L = cgGoalStats(div);
+      if (!L || L.n < 10) return null;
+      const H = L.teams[home], A = L.teams[away];
+      const avgH = L.hf / L.n, avgA = L.af / L.n;
+      const avg = (T) => {
+        if (!T) return null;
+        const n = T.hN + T.aN;
+        return n ? { f: (T.hF + T.aF) / n, s: (T.hA + T.aA) / n, n } : null;
+      };
+      const out = { home: avg(H), away: avg(A), xgH: null, xgA: null };
+      if (H && A && H.hN >= 2 && A.aN >= 2 && avgH > 0 && avgA > 0) {
+        out.xgH = (H.hF / H.hN / avgH) * (A.aA / A.aN / avgH) * avgH;
+        out.xgA = (A.aF / A.aN / avgA) * (H.hA / H.hN / avgA) * avgA;
+      }
+      return out;
+    }
+    function renderGoalLine(m) {
+      const g = cgTeamGoalInfo(state.selectedLeagueCode, m.home, m.away);
+      if (!g || (!g.home && !g.away)) return "";
+      const f = v => (v === null || v === undefined) ? "—" : v.toFixed(2);
+      const side = (t, xg) => t
+        ? `<span class="text-[11px] text-cyan-200 font-semibold" title="xG stimato">xG ${f(xg)}</span> <span class="text-[11px] text-slate-300" title="Media gol fatti / subiti">⌀ <b class="text-emerald-300">${t.f.toFixed(2)}</b>/<b class="text-rose-300">${t.s.toFixed(2)}</b></span>`
+        : `<span class="text-[11px] text-slate-500">n/d</span>`;
+      return `
+                  <div class="text-[10px] uppercase tracking-wider text-slate-400 mt-1.5">xG stimati • media gol (fatti/subiti)</div>
+                  <div class="flex items-center flex-wrap gap-x-2 gap-y-1 mt-0.5">
+                    ${side(g.home, g.xgH)}
+                    <span class="text-slate-600">|</span>
+                    ${side(g.away, g.xgA)}
+                  </div>`;
     }
 
     function renderPctText(val, extraClasses = "") {
@@ -1529,7 +1585,7 @@
                     <span class="text-slate-600">|</span>
                     <div class="flex items-center gap-1">${renderFormPills(m.awayFormArr)}</div>
                     <span class="text-[11px]">${renderPctText(m.awayForm)}</span>
-                  </div>
+                  </div>${renderGoalLine(m)}
                 </div>
 
                 <div class="cg-diff-box px-3 py-1.5 rounded-xl bg-slate-900/90 border border-slate-700/80 text-center min-w-[84px] ${isDiffBomb ? "flag-bomb" : ""}">
@@ -1708,6 +1764,19 @@
         }
 
         return null;
+      }
+
+      /* Famiglia di una giocata, dedotta dall'etichetta (vale anche per gli snapshot già salvati) */
+      function familyOfLabel(label) {
+        const c = String(label || "").trim().toUpperCase().replace(/\s+/g, " ");
+        if (!c) return "Altro";
+        if (c.includes("+") || c.includes("&")) return "Combo";
+        if (c === "1" || c === "X" || c === "2") return "Esito 1X2";
+        if (c === "1X" || c === "X2" || c === "12") return "Doppia chance";
+        if (c === "GG" || c === "GOL" || c === "NG" || c === "NOGOL" || c === "NO GOL") return "Gol / No Gol";
+        if (/^(OVER|UNDER|OV|UN)\s*[0-9]/.test(c)) return "Over / Under";
+        if (/^(MULTIGOL|MG)?\s*\d+\s*[-–]\s*\d+$/.test(c)) return "Multigol";
+        return "Altro";
       }
 
       function extractCardPicks(match, leagueCode) {
@@ -1917,7 +1986,8 @@
               leagueName: snap.leagueName || meta.name,
               country: snap.country || meta.country,
               real: { won: 0, estSum: 0, count: 0 },
-              dixon: { won: 0, estSum: 0, count: 0 }
+              dixon: { won: 0, estSum: 0, count: 0 },
+              fam: {}
             };
           }
 
@@ -1931,6 +2001,9 @@
               bucket[src].count += 1;
               bucket[src].estSum += pct;
               if (won) bucket[src].won += 1;
+              const fam = familyOfLabel(p.label);
+              const fb = bucket.fam[fam] || (bucket.fam[fam] = { won: 0, estSum: 0, count: 0 });
+              fb.count += 1; fb.estSum += pct; if (won) fb.won += 1;
             }
           }
         }
@@ -1957,6 +2030,31 @@
 
         const fmtRate = (w, c) => c > 0 ? formatPct((w / c) * 100) : "—";
         const fmtAvg = (sum, c) => c > 0 ? formatPct(sum / c) : "—";
+
+        /* scarto = % uscita - % stimata (verde: il modello è prudente, rosso: troppo ottimista) */
+        const famRow = (name, b) => {
+          const hit = b.count ? (b.won / b.count) * 100 : 0, est = b.count ? b.estSum / b.count : 0;
+          const d = hit - est;
+          return `<div class="flex flex-wrap items-center justify-between gap-2 text-xs py-1 border-b border-slate-800/70 last:border-0">
+            <span class="font-semibold text-slate-100">${name}</span>
+            <span class="text-slate-300">🟢 ${b.won} / 🔴 ${b.count - b.won} (${fmtRate(b.won, b.count)}) • stima <span class="text-cyan-200 font-semibold">${fmtAvg(b.estSum, b.count)}</span>
+              • scarto <span class="font-bold ${d >= 0 ? "text-emerald-400" : "text-rose-400"}">${d >= 0 ? "+" : ""}${d.toFixed(1)}</span></span>
+          </div>`;
+        };
+        const famTotals = {};
+        for (const r of rows) for (const [name, b] of Object.entries(r.fam)) {
+          const t = famTotals[name] || (famTotals[name] = { won: 0, estSum: 0, count: 0 });
+          t.won += b.won; t.estSum += b.estSum; t.count += b.count;
+        }
+        const famEl = document.getElementById("checkFamiliesContainer");
+        if (famEl) {
+          const names = Object.keys(famTotals).sort((a, b) => famTotals[b].count - famTotals[a].count);
+          famEl.innerHTML = names.length ? `<div class="glass-card rounded-xl p-4">
+              <div class="text-xs uppercase tracking-wider text-cyan-300 font-bold mb-1">🎯 Per famiglia di giocata (tutti i campionati)</div>
+              ${names.map(n => famRow(n, famTotals[n])).join("")}
+              <div class="text-[11px] text-slate-500 mt-2">Scarto = % uscita − % stimata. Negativo: il modello è troppo ottimista su quella famiglia.</div>
+            </div>` : "";
+        }
 
         const cardsEl = document.getElementById("checkSummaryCards");
         if (cardsEl) {
@@ -2015,6 +2113,10 @@
                   🟢 ${r.dixon.won} / 🔴 ${dLost} (${fmtRate(r.dixon.won, r.dixon.count)}) — Stima media: <span class="font-semibold text-white">${fmtAvg(r.dixon.estSum, r.dixon.count)}</span>
                 </div>
               </div>
+              ${Object.keys(r.fam).length ? `<details class="pt-1">
+                <summary class="cursor-pointer text-xs font-semibold text-cyan-300">🎯 Dettaglio per famiglia</summary>
+                <div class="mt-1.5">${Object.keys(r.fam).sort((a, b) => r.fam[b].count - r.fam[a].count).map(n => famRow(n, r.fam[n])).join("")}</div>
+              </details>` : ""}
             </div>
           `;
         }).join("");

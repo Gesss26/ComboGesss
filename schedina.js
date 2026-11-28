@@ -317,10 +317,78 @@
       ${pages > 1 ? `<button class="sk-btn sk-wide" data-act="more">🔄 Altre proposte</button>` : ""}`;
   }
 
+  /* ---------- Esportazione / importazione dati ---------- */
+  function download(name, text, mime) {
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(new Blob([text], { type: mime }));
+    a.download = name; document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  }
+  const stamp = () => new Date().toISOString().slice(0, 10);
+  function exportAll() {
+    const ls = {};
+    try { for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); if (/^(combogesss_|cg_)/.test(k)) ls[k] = localStorage.getItem(k); } } catch (_) {}
+    let snaps = {};
+    try { snaps = (window.cgCheckInternals && window.cgCheckInternals.snaps()) || {}; } catch (_) {}
+    download(`combogesss_backup_${stamp()}.json`, JSON.stringify({ app: "ComboGesss", version: 1, exportedAt: new Date().toISOString(), localStorage: ls, snapshots: snaps }, null, 2), "application/json;charset=utf-8");
+  }
+  function exportCsv() {
+    const q = v => `"${String(v == null ? "" : v).replace(/"/g, '""')}"`;
+    const rows = [["Creata", "Quota schedina", "Prob. stimata %", "Stato schedina", "Partita", "Data", "Giocata", "% stimata", "Quota evento", "Tipo quota", "Esito evento"]];
+    loadSaved().forEach(sc => {
+      const sts = sc.legs.map(legStatus);
+      const status = sts.includes(false) ? "Persa" : sts.every(x => x === true) ? "Vinta" : "In corso";
+      sc.legs.forEach((l, k) => rows.push([sc.createdAt, f2(sc.odd), (sc.prob * 100).toFixed(1), status, `${l.home} - ${l.away}`, l.date || "", l.label, Math.round(l.pct), f2(l.odd), l.oddType, sts[k] === null ? "In attesa" : sts[k] ? "Presa" : "Sbagliata"]));
+    });
+    download(`schedine_${stamp()}.csv`, "\ufeff" + rows.map(r => r.map(q).join(";")).join("\n"), "text/csv;charset=utf-8");
+  }
+  function importAll() {
+    const inp = document.createElement("input");
+    inp.type = "file"; inp.accept = ".json,application/json";
+    inp.onchange = () => {
+      const f = inp.files && inp.files[0]; if (!f) return;
+      const rd = new FileReader();
+      rd.onload = () => {
+        try {
+          const d = JSON.parse(rd.result);
+          if (!d || d.app !== "ComboGesss") throw new Error("File non valido");
+          let nSch = 0, nSnap = 0;
+          for (const [k, v] of Object.entries(d.localStorage || {})) {
+            if (k === LS_KEY) {
+              const cur = loadSaved(), have = new Set(cur.map(x => x.createdAt));
+              let add = []; try { add = JSON.parse(v) || []; } catch (_) {}
+              add.forEach(x => { if (!have.has(x.createdAt)) { cur.push(x); nSch++; } });
+              storeSaved(cur);
+            } else { try { localStorage.setItem(k, v); } catch (_) {} }
+          }
+          try {
+            const I = window.cgCheckInternals, cur = I && I.snaps();
+            if (cur) { for (const [k, v] of Object.entries(d.snapshots || {})) if (!cur[k]) { cur[k] = v; nSnap++; } I.persist(); }
+          } catch (_) {}
+          try { const fl = JSON.parse(localStorage.getItem(FLT_KEY) || "null"); if (fl) { ST.offLeagues = fl.offLeagues || {}; ST.offFamilies = fl.offFamilies || {}; } } catch (_) {}
+          renderFilters(); renderHistory();
+          alert(`Importazione completata: ${nSch} schedine e ${nSnap} snapshot aggiunti. Filtri e impostazioni ripristinati.`);
+        } catch (e) { alert("Importazione non riuscita: " + e.message); }
+      };
+      rd.readAsText(f);
+    };
+    inp.click();
+  }
+  const toolsHtml = () => `
+    <div class="sk-card sk-tools">
+      <b>💾 Dati</b>
+      <div class="sk-tools-row">
+        <button class="sk-btn sk-mini" data-act="exp-all">Esporta tutto (JSON)</button>
+        <button class="sk-btn sk-mini" data-act="exp-csv">Schedine (CSV)</button>
+        <button class="sk-btn sk-mini" data-act="imp-all">Importa backup</button>
+      </div>
+      <div class="sk-dim sk-small">Il backup include schedine, filtri, impostazioni e snapshot del Check. L’importazione unisce i dati senza cancellare quelli esistenti.</div>
+    </div>`;
+
   function renderHistory() {
     const saved = loadSaved();
     const box = $("#sk-history");
-    if (!saved.length) { box.innerHTML = `<div class="sk-msg">Nessuna schedina salvata. Generane una e premi “Salva”: l’esito verrà calcolato in automatico quando arrivano i risultati.</div>`; return; }
+    if (!saved.length) { box.innerHTML = toolsHtml() + `<div class="sk-msg">Nessuna schedina salvata. Generane una e premi “Salva”: l’esito verrà calcolato in automatico quando arrivano i risultati.</div>`; return; }
 
     let closed = 0, won = 0, units = 0, legN = 0, legHit = 0, legPct = 0;
     const cards = saved.map((s, i) => {
@@ -347,7 +415,7 @@
         <div>Saldo a 1 unità di puntata: <b class="${units >= 0 ? "pct-green" : "pct-red"}">${units >= 0 ? "+" : ""}${units.toFixed(2)}</b> <span class="sk-dim sk-small">(con le quote mostrate, anche quelle equa)</span></div>
         <div>${calib}</div>
         <div class="sk-dim sk-small">Se la % stimata è molto più alta di quella reale, il modello è troppo ottimista.</div>
-      </div>${cards}`;
+      </div>${toolsHtml()}${cards}`;
   }
 
   /* ---------- Azioni ---------- */
@@ -387,6 +455,9 @@
     else if (act === "conto") { if (window.CGConto) window.CGConto.addFromSchedina(ST.all[+t.dataset.idx], t); }
     else if (act === "conto-h") { const s = loadSaved()[+t.dataset.i]; if (s && window.CGConto) window.CGConto.addFromSchedina(s, t); }
     else if (act === "del") { const a = loadSaved(); a.splice(+t.dataset.i, 1); storeSaved(a); renderHistory(); }
+    else if (act === "exp-all") exportAll();
+    else if (act === "exp-csv") exportCsv();
+    else if (act === "imp-all") importAll();
     else if (act === "lg") { const c = t.dataset.code; if (ST.offLeagues[c]) delete ST.offLeagues[c]; else ST.offLeagues[c] = true; saveFilters(); renderFilters(); }
     else if (act === "lg-all") { ST.offLeagues = {}; saveFilters(); renderFilters(); }
     else if (act === "lg-none") { allLeagues().forEach(l => ST.offLeagues[l.code] = true); saveFilters(); renderFilters(); }
@@ -536,6 +607,8 @@
       #sk-overlay .sk-msg{padding:22px;text-align:center;color:#b4d6f2;font-size:calc(13px * var(--cg-fs,1))}
       #sk-overlay .sk-stats{font-size:calc(13px * var(--cg-fs,1));line-height:1.7}
       #sk-overlay .sk-fcard{margin:8px 0}
+      #sk-overlay .sk-tools{margin:8px 0}
+      #sk-overlay .sk-tools-row{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0}
       #sk-overlay .sk-fh{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:8px;font-size:calc(13px * var(--cg-fs,1))}
       #sk-overlay .sk-fh .sk-mini{margin-top:0}
       #sk-overlay .sk-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(128px,1fr));gap:6px}
