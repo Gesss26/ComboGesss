@@ -877,6 +877,15 @@
       }
       return out;
     }
+    function renderWeatherSlot(m) {
+      const esc = v => String(v == null ? "" : v).replace(/"/g, "&quot;");
+      return `<div class="cg-wx" data-home="${esc(m.home)}" data-date="${esc(m.date)}" data-time="${esc(m.time)}"></div>`;
+    }
+    function renderFormazioniSlot(m) {
+      if (state.selectedLeagueCode !== "I1") return "";   // formazioni fantacalcio.it: solo Serie A
+      const esc = v => String(v == null ? "" : v).replace(/"/g, "&quot;");
+      return `<div class="cg-fz" data-home="${esc(m.home)}" data-away="${esc(m.away)}"></div>`;
+    }
     function renderGoalLine(m) {
       const g = cgTeamGoalInfo(state.selectedLeagueCode, m.home, m.away);
       if (!g || (!g.home && !g.away)) return "";
@@ -1554,6 +1563,7 @@
             class="glass-card rounded-xl p-3.5 hover:border-cyan-400/50 hover:bg-slate-900/80 transition cursor-pointer ${isPlayed ? "match-played" : ""} ${!isPlayed && isToday ? "today-match" : ""}"
           >
             <div class="flex flex-col gap-3">
+              ${renderWeatherSlot(m)}
               <div class="text-left w-full">
                 <div class="flex items-center gap-2 text-sm font-bold text-white">
                   ${renderFlagBadge(meta.nation, "w-4 h-3")}
@@ -1585,7 +1595,7 @@
                     <span class="text-slate-600">|</span>
                     <div class="flex items-center gap-1">${renderFormPills(m.awayFormArr)}</div>
                     <span class="text-[11px]">${renderPctText(m.awayForm)}</span>
-                  </div>${renderGoalLine(m)}
+                  </div>${renderGoalLine(m)}${renderFormazioniSlot(m)}
                 </div>
 
                 <div class="cg-diff-box px-3 py-1.5 rounded-xl bg-slate-900/90 border border-slate-700/80 text-center min-w-[84px] ${isDiffBomb ? "flag-bomb" : ""}">
@@ -1602,6 +1612,8 @@
           </div>
         `;
       }).join("");
+      if (typeof window.cgWeatherFill === "function") window.cgWeatherFill(listEl);
+      if (typeof window.cgFormazioniFill === "function") window.cgFormazioniFill(listEl);
     }
 
     function openMatchStats(matchId) {
@@ -2202,7 +2214,9 @@
     })();
   </script>
 
+  <script src="./meteo.js"></script>
   <script src="./statistiche-partita.js"></script>
+  <script src="./formazioni.js"></script>
   <script src="./schedina.js"></script>
   <script src="./conto.js"></script>
   <script src="./home.js"></script>

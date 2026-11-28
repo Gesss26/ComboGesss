@@ -1193,6 +1193,7 @@
     const standings = computeLeagueStandings(match, leagueCode, resultsRows, fixturesRows);
 
     const sampleInfo = `${homeHist.length} gare ${match.home} • ${awayHist.length} gare ${match.away}`;
+    const fzOn = typeof window.cgFormazioniPanel === "function" && typeof window.cgFormazioniEnabled === "function" && window.cgFormazioniEnabled(leagueCode);
 
     content.innerHTML = `
       <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
@@ -1200,6 +1201,7 @@
         <div class="lg:col-span-7 space-y-5">
           <!-- Header Partita -->
           <div class="rounded-2xl bg-gradient-to-br from-slate-900 via-slate-900 to-cyan-950/30 border border-slate-700/70 p-5 sm:p-6 shadow-2xl">
+            <div id="cgStatsWx" class="hidden rounded-xl bg-slate-950/70 border border-cyan-500/30 px-3 py-2 mb-4 text-center"></div>
             <div class="flex flex-wrap items-center justify-between gap-2 text-xs text-slate-300 mb-4">
               <div class="flex items-center gap-2 font-semibold">
                 ${flagHtml || ""}
@@ -1291,6 +1293,9 @@
             <button type="button" data-cg-tab-btn="frequenza" onclick="switchMatchStatsTab('frequenza')" class="px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold bg-slate-900/90 text-slate-300 border border-slate-800 hover:border-slate-600 transition cursor-pointer">
               ⚽ Frequenza Gol
             </button>
+            ${fzOn ? `<button type="button" data-cg-tab-btn="formazioni" onclick="switchMatchStatsTab('formazioni')" class="px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold bg-slate-900/90 text-slate-300 border border-slate-800 hover:border-slate-600 transition cursor-pointer">
+              👥 Formazioni
+            </button>` : ""}
           </div>
 
           <!-- Tab 1: Statistiche Reali -->
@@ -1322,6 +1327,11 @@
               ${renderGoalFreqColumn(match.away, awayHist, "text-sky-300", "bg-sky-400", "Squadra in trasferta")}
             </div>
           </div>
+
+          ${fzOn ? `<!-- Tab 5: Formazioni e assenze (fantacalcio.it) -->
+          <div data-cg-tab-panel="formazioni" class="hidden">
+            <div id="cgFzPanelBody" style="color:#86b3d8;font-size:13px">Caricamento formazioni…</div>
+          </div>` : ""}
         </div>
 
         <!-- Colonna Destra: Classifica Campionato con le 2 squadre in oro -->
@@ -1330,6 +1340,23 @@
         </div>
       </div>
     `;
+
+    // Meteo allo stadio della squadra di casa (meteo.js); se non disponibile il riquadro resta nascosto
+    if (typeof window.cgWeatherFor === "function" && typeof window.cgWeatherHtml === "function") {
+      window.cgWeatherFor(match).then(function (w) {
+        const box = document.getElementById("cgStatsWx");
+        if (!w || !box) return;
+        box.innerHTML = window.cgWeatherHtml(w).replace("flex items-center flex-wrap", "flex items-center justify-center flex-wrap");
+        box.classList.remove("hidden");
+      });
+    }
+
+    if (fzOn) {
+      window.cgFormazioniReady().then(function () {
+        const body = document.getElementById("cgFzPanelBody");
+        if (body) body.innerHTML = window.cgFormazioniPanel(match);
+      });
+    }
 
     overlay.classList.remove("hidden");
     overlay.scrollTop = 0;
