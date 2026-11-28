@@ -831,7 +831,57 @@
     return list;
   }
 
-  function renderStandingsCard(standings, homeName, awayName, leagueName) {
+  /* Zone della classifica per campionato. Modificabili: { da, a } = posizioni (1 = prima),
+     { ultime: N } = ultime N posizioni. Le regole UEFA possono cambiare da una stagione all'altra
+     (es. 5° posto Champions per il ranking europeo): aggiorna qui. */
+  const ZONE_STYLE = {
+    cl:    { label: "Champions League",        rgb: "59,130,246" },
+    el:    { label: "Europa League",           rgb: "249,115,22" },
+    conf:  { label: "Conference League",       rgb: "20,184,166" },
+    promo: { label: "Promozione",              rgb: "16,185,129" },
+    po:    { label: "Playoff",                 rgb: "167,139,250" },
+    pout:  { label: "Playout / spareggio",     rgb: "245,158,11" },
+    rel:   { label: "Retrocessione",           rgb: "239,68,68" }
+  };
+  const LEAGUE_ZONES = {
+    I1:  [{ da: 1, a: 4, k: "cl" }, { da: 5, a: 5, k: "el" }, { da: 6, a: 6, k: "conf" }, { ultime: 3, k: "rel" }],
+    E0:  [{ da: 1, a: 4, k: "cl" }, { da: 5, a: 5, k: "el" }, { da: 6, a: 6, k: "conf" }, { ultime: 3, k: "rel" }],
+    SP1: [{ da: 1, a: 4, k: "cl" }, { da: 5, a: 6, k: "el" }, { da: 7, a: 7, k: "conf" }, { ultime: 3, k: "rel" }],
+    D1:  [{ da: 1, a: 4, k: "cl" }, { da: 5, a: 5, k: "el" }, { da: 6, a: 6, k: "conf" }, { ultime: 1, k: "pout", offset: 2 }, { ultime: 2, k: "rel" }],
+    F1:  [{ da: 1, a: 3, k: "cl" }, { da: 4, a: 4, k: "el" }, { da: 5, a: 5, k: "conf" }, { ultime: 1, k: "pout", offset: 2 }, { ultime: 2, k: "rel" }],
+    I2:  [{ da: 1, a: 2, k: "promo" }, { da: 3, a: 8, k: "po" }, { ultime: 3, k: "rel" }],
+    E1:  [{ da: 1, a: 2, k: "promo" }, { da: 3, a: 6, k: "po" }, { ultime: 3, k: "rel" }],
+    E2:  [{ da: 1, a: 2, k: "promo" }, { da: 3, a: 6, k: "po" }, { ultime: 4, k: "rel" }],
+    E3:  [{ da: 1, a: 3, k: "promo" }, { da: 4, a: 7, k: "po" }, { ultime: 2, k: "rel" }],
+    EC:  [{ da: 1, a: 1, k: "promo" }, { da: 2, a: 7, k: "po" }, { ultime: 4, k: "rel" }],
+    SP2: [{ da: 1, a: 2, k: "promo" }, { da: 3, a: 6, k: "po" }, { ultime: 4, k: "rel" }],
+    D2:  [{ da: 1, a: 2, k: "promo" }, { da: 3, a: 3, k: "po" }, { ultime: 1, k: "pout", offset: 2 }, { ultime: 2, k: "rel" }],
+    F2:  [{ da: 1, a: 2, k: "promo" }, { da: 3, a: 5, k: "po" }, { ultime: 1, k: "pout", offset: 2 }, { ultime: 2, k: "rel" }]
+  };
+  function zoneForPosition(leagueCode, pos, total) {
+    const rules = LEAGUE_ZONES[String(leagueCode || "").toUpperCase()] || [];
+    for (const r of rules) {
+      if (r.ultime) {
+        // offset = quante posizioni sopra il fondo classifica (es. 16° su 18 = ultime 1 con offset 2)
+        const last = total - (r.offset || 0), first = last - r.ultime + 1;
+        if (pos >= first && pos <= last) return r.k;
+      } else if (pos >= r.da && pos <= r.a) return r.k;
+    }
+    return null;
+  }
+  function renderZoneLegend(leagueCode, total) {
+    const used = [];
+    for (let pos = 1; pos <= total; pos++) {
+      const k = zoneForPosition(leagueCode, pos, total);
+      if (k && !used.includes(k)) used.push(k);
+    }
+    if (!used.length) return "";
+    return `<div style="display:flex;flex-wrap:wrap;gap:6px 12px;padding-top:8px;border-top:1px solid rgba(56,189,248,.15)">` +
+      used.map(k => `<span style="display:inline-flex;align-items:center;gap:5px;font-size:10px;color:#b4d6f2"><span style="width:12px;height:12px;border-radius:3px;background:rgba(${ZONE_STYLE[k].rgb},.55);border:1px solid rgb(${ZONE_STYLE[k].rgb})"></span>${ZONE_STYLE[k].label}</span>`).join("") +
+      `</div>`;
+  }
+
+  function renderStandingsCard(standings, homeName, awayName, leagueName, leagueCode) {
     const homeKey = String(homeName || "").trim().toLowerCase();
     const awayKey = String(awayName || "").trim().toLowerCase();
 
@@ -851,11 +901,16 @@
       const isHighlighted = row.key === homeKey || row.key === awayKey;
       const badgeRole = row.key === homeKey ? "CASA" : row.key === awayKey ? "TRASF." : "";
 
+      const zk = zoneForPosition(leagueCode, pos, standings.length);
+      const zrgb = zk ? ZONE_STYLE[zk].rgb : null;
+      const rowStyle = zrgb && !isHighlighted ? `background:linear-gradient(90deg,rgba(${zrgb},.30),rgba(${zrgb},.12));` : "";
+      const stripe = zrgb ? `box-shadow:inset 4px 0 0 rgb(${zrgb});` : "";
+
       return `
-        <tr class="border-b border-slate-800/70 last:border-b-0 transition ${
-          isHighlighted ? "standings-team-gold text-amber-200 font-bold" : "hover:bg-slate-800/40 text-slate-200"
+        <tr style="${rowStyle}" class="border-b border-slate-800/70 last:border-b-0 transition ${
+          isHighlighted ? "standings-team-gold text-amber-200 font-bold" : "text-slate-200"
         }">
-          <td class="py-2 pl-2 pr-1 text-[11px] ${isHighlighted ? "text-amber-300 font-extrabold" : "text-slate-400"}">${pos}</td>
+          <td style="${stripe}" class="py-2 pl-2 pr-1 text-[11px] ${isHighlighted ? "text-amber-300 font-extrabold" : "text-slate-300 font-bold"}">${pos}</td>
           <td class="py-2 px-1.5 text-xs">
             <div class="flex items-center justify-between gap-1">
               <span class="truncate ${isHighlighted ? "text-amber-200 font-extrabold" : "text-white font-semibold"}">${row.name}</span>
@@ -907,6 +962,7 @@
             </tbody>
           </table>
         </div>
+        ${renderZoneLegend(leagueCode, standings.length)}
       </aside>
     `;
   }
@@ -1336,7 +1392,7 @@
 
         <!-- Colonna Destra: Classifica Campionato con le 2 squadre in oro -->
         <div class="lg:col-span-5">
-          ${renderStandingsCard(standings, match.home, match.away, leagueName || leagueCode)}
+          ${renderStandingsCard(standings, match.home, match.away, leagueName || leagueCode, leagueCode)}
         </div>
       </div>
     `;
