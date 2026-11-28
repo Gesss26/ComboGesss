@@ -913,18 +913,18 @@
           <td style="${stripe}" class="py-2 pl-2 pr-1 text-[11px] ${isHighlighted ? "text-amber-300 font-extrabold" : "text-slate-300 font-bold"}">${pos}</td>
           <td class="py-2 px-1.5 text-xs">
             <div class="flex items-center justify-between gap-1">
-              <span class="truncate ${isHighlighted ? "text-amber-200 font-extrabold" : "text-white font-semibold"}">${row.name}</span>
-              ${badgeRole ? `<span class="text-[9px] px-1.5 py-0.5 rounded bg-amber-400/20 text-amber-300 border border-amber-400/50 font-extrabold shrink-0">${badgeRole}</span>` : ""}
+              <span class="truncate min-w-0 max-w-[110px] sm:max-w-none ${isHighlighted ? "text-amber-200 font-extrabold" : "text-white font-semibold"}">${row.name}</span>
+              ${badgeRole ? `<span class="hidden sm:inline text-[9px] px-1.5 py-0.5 rounded bg-amber-400/20 text-amber-300 border border-amber-400/50 font-extrabold shrink-0">${badgeRole}</span>` : ""}
             </div>
           </td>
           <td class="py-2 px-1 text-center text-[11px] ${isHighlighted ? "text-cyan-300" : "text-slate-300"}">${row.won}</td>
           <td class="py-2 px-1 text-center text-[11px] ${isHighlighted ? "text-yellow-300" : "text-slate-300"}">${row.drawn}</td>
           <td class="py-2 px-1 text-center text-[11px] ${isHighlighted ? "text-rose-300" : "text-slate-300"}">${row.lost}</td>
-          <td class="py-2 px-1 text-center text-[11px] ${isHighlighted ? "text-cyan-300" : "text-slate-300"}">${row.gf}</td>
-          <td class="py-2 px-1 text-center text-[11px] ${isHighlighted ? "text-rose-300" : "text-slate-300"}">${row.ga}</td>
+          <td class="hidden sm:table-cell py-2 px-1 text-center text-[11px] ${isHighlighted ? "text-cyan-300" : "text-slate-300"}">${row.gf}</td>
+          <td class="hidden sm:table-cell py-2 px-1 text-center text-[11px] ${isHighlighted ? "text-rose-300" : "text-slate-300"}">${row.ga}</td>
           <td class="py-2 px-1 text-center text-[11px] ${isHighlighted ? "text-amber-200" : "text-slate-300"}">${row.gd > 0 ? `+${row.gd}` : row.gd}</td>
-          <td class="py-2 px-1 text-center text-[11px] ${isHighlighted ? "text-amber-200" : "text-slate-300"}">${row.avgGoals.toFixed(2)}</td>
-          <td class="py-2 px-1 text-center text-[11px] ${isHighlighted ? "text-amber-300" : "text-sky-300"}">${row.xg.toFixed(2)}</td>
+          <td class="hidden sm:table-cell py-2 px-1 text-center text-[11px] ${isHighlighted ? "text-amber-200" : "text-slate-300"}">${row.avgGoals.toFixed(2)}</td>
+          <td class="hidden sm:table-cell py-2 px-1 text-center text-[11px] ${isHighlighted ? "text-amber-300" : "text-sky-300"}">${row.xg.toFixed(2)}</td>
           <td class="py-2 pl-1 pr-2 text-right text-xs font-extrabold ${isHighlighted ? "text-amber-300" : "text-cyan-400"}">${row.points}</td>
         </tr>
       `;
@@ -949,11 +949,11 @@
                 <th class="py-1.5 px-1 text-center" title="Vittorie">V</th>
                 <th class="py-1.5 px-1 text-center" title="Pareggi">P</th>
                 <th class="py-1.5 px-1 text-center" title="Sconfitte">S</th>
-                <th class="py-1.5 px-1 text-center" title="Gol Fatti">GF</th>
-                <th class="py-1.5 px-1 text-center" title="Gol Subiti">GS</th>
+                <th class="hidden sm:table-cell py-1.5 px-1 text-center" title="Gol Fatti">GF</th>
+                <th class="hidden sm:table-cell py-1.5 px-1 text-center" title="Gol Subiti">GS</th>
                 <th class="py-1.5 px-1 text-center" title="Differenza Reti">DR</th>
-                <th class="py-1.5 px-1 text-center" title="Media Gol partita">Media</th>
-                <th class="py-1.5 px-1 text-center" title="xG medio squadra">xG</th>
+                <th class="hidden sm:table-cell py-1.5 px-1 text-center" title="Media Gol partita">Media</th>
+                <th class="hidden sm:table-cell py-1.5 px-1 text-center" title="xG medio squadra">xG</th>
                 <th class="py-1.5 pl-1 pr-2 text-right" title="Punti">Pt</th>
               </tr>
             </thead>
